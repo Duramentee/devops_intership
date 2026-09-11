@@ -27,6 +27,16 @@ go.work.sum
 # env file
 .env
 
+# Node 工具链（pdf -> txt 转换用）
+node_modules/
+package-lock.json
+
+# 转换出的书籍正文：体积大且涉版权，不提交
+text/
+
+# 回收目录（确认无用后自行 rm -rf .trash）
+.trash/
+
 # Editor/IDE
 # .idea/
 # .vscode/
