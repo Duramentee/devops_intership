@@ -3,9 +3,9 @@
  * pdf2text.mjs —— 把 PDF 转成「带页码标记的纯文本」，供 AI agent 按行/按页精准读取。
  *
  * 用法:
- *   node .tools/pdf2text.mjs pdf/新书.pdf                 # 全本转换 -> text/新书.txt
- *   node .tools/pdf2text.mjs pdf/新书.pdf --pages 100-160  # 只转需要的页段
- *   node .tools/pdf2text.mjs pdf/新书.pdf -o text/x.txt    # 指定输出
+ *   node .tools/pdf2text.mjs assets/pdf/新书.pdf                 # 全本转换 -> assets/text/新书.txt
+ *   node .tools/pdf2text.mjs assets/pdf/新书.pdf --pages 100-160  # 只转需要的页段
+ *   node .tools/pdf2text.mjs assets/pdf/新书.pdf -o assets/text/x.txt  # 指定输出
  *
  * 省 token 的三个设计点:
  *   1) 一次转换永久复用 —— agent 之后只读 txt，永远不再解析几十 MB 的 PDF；
@@ -31,7 +31,7 @@ if (!argv.length || argv.includes('-h') || argv.includes('--help')) {
 const input = argv[0];
 const outIdx = Math.max(argv.indexOf('-o'), argv.indexOf('--out'));
 const defaultOut = path.join(
-  'text',
+  'assets/text',
   path.basename(input).replace(/\.pdf$/i, '') + '.txt',
 );
 const output = outIdx > 0 ? argv[outIdx + 1] : defaultOut;
