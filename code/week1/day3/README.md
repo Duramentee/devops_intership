@@ -95,12 +95,12 @@
 
 ### 步骤 5 · 验收（全部打勾才算完成）
 
-- [ ] `docker images` 里 `webapp:v2` 明显小于 `webapp:v1`（目标 < 50MB，冲进 10MB 更好）
-- [ ] `curl localhost:8081` 有响应
-- [ ] 能**指着 `docker history webapp:v2`** 说出"Go 工具链那 254MB 去哪了"
-- [ ] 能解释"builder 阶段为什么不会被打包进最终镜像"（自检题）
-- [ ] `scratch`/`distroless` 至少试过一次，踩的坑记进笔记
-- [ ] `notes/week1/day3.md` 四段写满
+- [x] `docker images` 里 `webapp:v2` 明显小于 `webapp:v1`（目标 < 50MB，冲进 10MB 更好）—— **实测 v2 = 25.3MB，v3 = 12.6MB**
+- [x] `curl localhost:8081` 有响应 —— `<h1>Hello DevOps</h1>`；v3 `-p 8082:8080` 同样有响应
+- [x] 能**指着 `docker history webapp:v2`** 说出"Go 工具链那 254MB 去哪了" —— 留在 builder 阶段的文件系统里，没被采纳进最终镜像
+- [x] 能解释"builder 阶段为什么不会被打包进最终镜像"（自检题）—— 层只由被采纳的指令产生，`COPY --from` 是唯一通道
+- [x] `scratch`/`distroless` 至少试过一次，踩的坑记进笔记 —— `Dockerfile.scratch` 已跑通；坑：无 shell 无法 `exec`、`-p` 端口写错
+- [x] `notes/week1/day3.md` 四段写满
 
 ---
 
