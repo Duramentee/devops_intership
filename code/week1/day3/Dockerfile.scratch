@@ -1,0 +1,13 @@
+# ---- 阶段 1：编译（Day 2 那套 + AS 命名）----
+FROM golang:1.25.1-alpine AS builder
+WORKDIR /src
+COPY go.mod ./
+RUN go mod tidy
+COPY main.go ./
+RUN CGO_ENABLED=0 go build -o /out/webapp ./main.go
+
+# ---- 阶段 2：只放产物 ----
+FROM scratch
+WORKDIR /app
+COPY --from=builder /out/webapp /app/webapp
+CMD [ "./webapp" ] 
