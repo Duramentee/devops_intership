@@ -40,3 +40,7 @@ assets/text/
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Docker 练习产物（本地编译的二进制与日志：不提交、也不该 COPY 进镜像）
+webapp
+*.log
