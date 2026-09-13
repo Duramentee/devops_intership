@@ -17,7 +17,7 @@
 
 | 天 | 代码目录 | 主题 |
 |---|---|---|
-| Day 1 | `code/week1/day1/` | shell 分词实验（`split.sh` + `a b.txt`） |
+| Day 1 | `code/week1/day1/` | shell 实验 |
 | Day 2 | `code/week1/day2/` | 镜像分层与 Dockerfile |
 | Day 3 | `code/week1/day3/` | 多阶段构建 |
 | Day 4 | `code/week1/day4/` | 数据与网络 |
