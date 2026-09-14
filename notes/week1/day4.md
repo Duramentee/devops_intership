@@ -8,6 +8,21 @@
 
 ---
 
+## 今日速览（先看这 6 条）
+
+| # | 结论 |
+|---|---|
+| 1 | **可写层跟「容器对象」走，不跟进程** —— `restart` 数据在；`rm`+`run` 数据丢（两次容器 ID 不同 = 铁证） |
+| 2 | **命名卷是 Docker 的独立对象**，`rm -f` 容器不影响它；**bind 就是你那个宿主目录**，Docker 只是搬运工 |
+| 3 | **空卷会预填充镜像内容；bind 只遮盖、不拷贝** —— 这条最容易混 |
+| 4 | **默认 bridge 没有名字服务**（`NXDOMAIN`）；自定义网络靠 dockerd 内嵌 DNS（`127.0.0.11`）。⚠️ 但默认 bridge **按 IP 仍能互访** |
+| 5 | **`-p 8081:8080` = 一条 DNAT**：`宿主:8081 → 容器IP:8080`（已实测到规则）+ `docker-proxy` 兜 localhost |
+| 6 | **本机是 Docker Desktop**：dockerd 在 VM 里 → 宿主看不到 `/var/lib/docker`、没有 `iptables`、`ss -ltnp` 看不到属主 |
+
+> **明天（Day 5）开头抽查**：① `run` vs `restart` 对可写层的差别 ② 卷 vs bind 谁管生命周期 ③ 默认 bridge 能否容器互访（要**精确说法**）。
+
+---
+
 ## 今日任务清单
 
 | # | 任务 | 完成 |
@@ -16,12 +31,12 @@
 | 2 | 命名卷：`-v webvol:/data`，数据还在 | ✅ |
 | 3 | bind mount：宿主目录双向对比 | ✅ |
 | 4 | tmpfs：容器停即失 | ✅ |
-| 5 | 默认 bridge 解析**失败** → `mynet` **成功** | ⬜ |
-| 6 | `mynet` 内不写 `-p`，用容器名访问服务 | ⬜ |
-| 7 | 端口三视角：`docker port` / `ss -ltnp` / 容器内 `netstat` | ⬜ |
+| 5 | 默认 bridge 解析**失败** → `mynet` **成功** | ✅ |
+| 6 | `mynet` 内不写 `-p`，用容器名访问服务 | ✅ |
+| 7 | 端口三视角：`docker port` / `ss -ltnp` / 容器内 `netstat` | ✅ |
 | 8 | 结论写进本笔记四段 | ⬜ |
 
-> 存储（1~4）已闭环；网络（5~7）进行中。
+> 存储（1~4）+ 网络（5~7）已闭环；只剩 8：四段收尾 + 两道每日一题（留到明天）。
 
 ---
 
@@ -47,23 +62,27 @@
 
 | 场景 | 现象 | 命令 |
 |---|---|---|
-| 默认 bridge，用容器名解析 | | |
-| `mynet`，用容器名解析 | | |
-| `mynet` 内访问 `http://w1:8080`（无 `-p`） | | |
+| 默认 bridge，用容器名解析 | `** server can't find n1: NXDOMAIN`；`wget: bad address 'n1:8080'` | `docker run --rm alpine:3.22 nslookup n1` |
+| `mynet`，用容器名解析 | `Server: 127.0.0.11` → `Name: n1 / Address: 172.19.0.2` | `docker run --rm --network mynet alpine:3.22 nslookup n1` |
+| `mynet` 内访问 `http://w1:8080`（**无 `-p`**） | `<h1>Hello DevOps</h1>` | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` |
 
-### 端口三视角
+**`/etc/resolv.conf` 一行之差（今天的题眼）**
+
+| 网络 | nameserver | 注释里的线索 |
+|---|---|---|
+| 默认 `bridge` | `192.168.65.7` | `(legacy)` —— 直接抄宿主（Docker Desktop VM）的 DNS，**没有名字服务** |
+| `mynet` | **`127.0.0.11`** | `(internal resolver)` + `ExtServers: [host(192.168.65.7)]` + `options ndots:0` —— **dockerd 的内嵌解析器**，非本网络的域名转发给上游 |
+
+### 端口三视角（`-p 8081:8080`）
 
 | 视角 | 命令 | 输出 |
 |---|---|---|
-| 宿主侧监听进程 | `ss -ltnp \| grep 8081` | |
-| 映射表 | `docker port web2` | |
-| 容器内谁在听 | `docker exec web2 netstat -tlnp` | |
-
-**踩坑记录：**
-
-| 现象 | 我怎么判断的 | 解法 |
-|---|---|---|
-| | | |
+| 宿主侧监听 | `sudo ss -ltnp \| grep 8081` | `LISTEN *:8081` —— ⚠️ **连 sudo 也看不到进程名**（Docker Desktop 的转发组件，见易错点） |
+| 映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081` + `[::]:8081`（**左=容器，右=宿主**，与 `-p` 顺序相反） |
+| 容器内谁在听 | `docker exec d4p netstat -tlnp` | `tcp :::8080 LISTEN 1/webapp` ← 容器内是 **8080**，PID 1 = 应用本身 |
+| **DNAT 规则** | `docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` | ✅ 实测 `Chain DOCKER (2 references)` + `DNAT tcp dpt:8081 to:172.17.0.2:8080` ← **直接验证「宿主:8081 → 容器IP:8080」** |
+| 没写 `-p` 时从宿主访问 | `curl localhost:8080` | **`curl: (7)`** = 找不到门（宿主没人 listen） |
+| 容器删掉之后 | `docker rm -f d4p && sudo ss -ltnp \| grep 8081`；`docker port d4p` | 宿主监听**变空**（跟着容器走）；`docker port` → `Error response from daemon: No such container: d4p` |
 
 ---
 
@@ -113,6 +132,7 @@
 **一句话版**：**7 = 找不到门；56 = 门开了但屋里没人；28 = 敲门没人应也没人拒；52 = 有人应了但一句话不说。**
 
 ---
+
 ## 预判对账（开场 5 条）
 
 | # | 预判 | 判定 |
@@ -162,7 +182,7 @@
 | 网络细节（子网 / 网关 / 成员） | `docker network inspect bridge` / `mynet` |
 | 网桥本身 | `ip -br addr show docker0` |
 | 容器视角：路由 / DNS | `docker exec n1 ip route`；`docker exec n1 cat /etc/resolv.conf` |
-| DNAT 规则（需 root） | `sudo iptables -t nat -L DOCKER -n` |
+| DNAT 规则 | `docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` | ⚠️ 宿主上直接跑 `iptables` 会 `command not found`（规则在 VM 里） |
 | 容器挂在哪些网络 | `docker inspect -f '{{json .NetworkSettings.Networks}}' n1` |
 
 **失败模式**
@@ -175,7 +195,8 @@
 | 容器出不了网 | SNAT / 转发开关 | `iptables -t nat -L POSTROUTING -n`；`sysctl net.ipv4.ip_forward` |
 
 ---
-## 每日一题（先自己写答案 → 再找人批改）
+
+## 每日一题（⏳ 明天做 · 先自己写答案 → 再找人批改）
 
 ### 容器题 · 排障题
 
@@ -201,11 +222,11 @@
 | 命名卷的本质是什么（宿主上是什么） | 「宿主」= **跑 dockerd 的那台机器**上的一个目录（`/var/lib/docker/volumes/<名>/_data`），**不等于你的本地 shell**。本机是 Docker Desktop → 该目录在 **VM 内部**，宿主 `sudo ls` 报 `No such file or directory`。卷 = **Docker 管的独立对象**，只是「恰好」落在一个目录上；`Scope: local` = 只属于**单台 daemon**（这就是卷不能跨主机的原因） |
 | volume vs bind mount 的区别 | ① **谁建**：卷是 Docker 建（`docker volume create` / 自动建），bind 是你 `mkdir` 的普通目录。② **谁管**：卷是 Docker 对象（`docker volume rm`），bind 归操作系统（`rm -rf`）。③ **空目录行为**：空卷会**预填充**镜像内容（实测 8037381 字节 = Day 3 那个二进制）；bind **无条件遮盖**（空目录就是空）。④ **可移植性**：卷能 `docker volume ls` 看到、由 Docker 管理；bind 路径写错会静默新建空目录、或**静默变成卷名**。⑤ **适用**：卷=生产数据；bind=开发时挂代码/配置 |
 | `--rm` 对 volume / bind mount 分别有什么影响 | `--rm` 只删**容器**（以及它创建的**匿名卷**）。**命名卷**和 **bind 宿主目录**都不受影响，数据都还在 |
-| 默认 bridge 为什么不能按容器名解析 | |
-| 自定义网络的「内嵌 DNS」是谁在跑 | |
-| `-p 8081:8080` 背后发生了什么（DNAT） | |
-| 容器间通信需要 `-p` 吗？`-p` 服务于谁 | |
-| 为什么说「容器内 8080」和「宿主 8081」是两个世界 | |
+| 默认 bridge 为什么不能按容器名解析 | `docker0` 上只有 IP、**没有名字服务**；容器 resolv.conf 抄的是宿主（Docker Desktop VM）的 `192.168.65.7`，注释写 `(legacy)` → `nslookup n1` 得 **NXDOMAIN**、`wget` 得 `bad address`。⚠️ 精确说法：**能按 IP 互访**，只是**不能按名字** |
+| 自定义网络的「内嵌 DNS」是谁在跑 | **dockerd**。它给容器写 `nameserver 127.0.0.11`（注释 `(internal resolver)`），并用 iptables 把该地址**劫持**到自己的解析器；非本网络的域名转发给 `ExtServers: [host(192.168.65.7)]`；`ndots:0` 也是它加的。所以名字与容器**实时同步** |
+| `-p 8081:8080` 背后发生了什么（DNAT） | **实测规则**（在 VM 的 netns 里查到）：`Chain DOCKER (2 references)` → `DNAT tcp dpt:8081 to:172.17.0.2:8080` —— 即「**目的=宿主:8081 的包，把目的地址改写成容器IP:8080**」。`(2 references)` 说明这条链被引用了 2 次（`PREROUTING` 管外部流量 + `OUTPUT` 管本机/localhost 流量）。另外 Dockerd 还会起 `docker-proxy` 在宿主端口上真的 listen，兜住 iptables 处理不好的路径 |
+| 容器间通信需要 `-p` 吗？`-p` 服务于谁 | **不需要**。同子网容器**二层直连**（`172.19.0.2` ↔ `172.19.0.3`），根本不经过宿主。**`-p` 只服务于「宿主/外部 → 容器」这一段** |
+| 为什么说「容器内 8080」和「宿主 8081」是两个世界 | 两个不同的 **net namespace**：容器里的 `8080` 是应用 listen 的端口（属于容器 netns）；宿主的 `8081` 是 DNAT 规则 + docker-proxy 的入口。**同一个服务，两个 namespace 里的两个端口** |
 
 ### 附：四层生命周期对照（`stop` / `restart` / `rm` 的分水岭）
 
@@ -236,6 +257,8 @@
 - 用途：① 密钥/证书（不落盘）② 临时缓存 / 上传中转（不污染可写层）③ Unix socket 目录
 - `Size 5.8G` = **可用内存的一半**（反推容器看到的内存 ≈ 11.6GB）
 
+---
+
 ## 命令
 
 | 场景 | 命令 | 说明 |
@@ -252,10 +275,17 @@
 | 更安全的挂载写法 | `--mount type=bind,src=$PWD/hostdir,dst=/data` | 显式声明类型，无「被当卷名」歧义 |
 | 临时内存盘 | `docker run --tmpfs /tmp webapp:v2 sh -c 'df -h /tmp; mount \| grep /tmp'` | 容器停/重启即失；默认带 **`noexec`** |
 | 指定大小/权限 | `--tmpfs /tmp:rw,size=64m,mode=1777`（要能执行加 `exec`） | 默认 size = 内存一半 |
+| 发布端口 | `docker run -d -p 8081:8080 --name d4p webapp:v2` | **左=宿主，右=容器** |
+| 看映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081`（左边容器、右边宿主） |
+| 宿主侧谁在听 | `sudo ss -ltnp \| grep 8081` | 本机（Docker Desktop）**连 sudo 也看不到属主**，只有 `LISTEN *:8081` |
+| 容器内谁在听 | `docker exec d4p netstat -tlnp` | `:::8080 LISTEN 1/webapp`（`:::` = IPv6 通配 + 双栈，也收 IPv4） |
+| 自定义网络里用名字访问 | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` | 不需要 `-p` |
 
 ### 报错前缀 = 谁在说话
 
 → 完整表见 `docs/docker/05-排障索引.md` §三「报错前缀」。**本日实测三个**：`OCI runtime exec failed`（runc —— `cat` 打成 `car`）· `Error response from daemon`（dockerd —— 删运行中容器被拒）· `template parsing error`（本地 CLI —— `GraphDriver` 字段不存在）。
+
+---
 
 ## 易错点
 
@@ -268,8 +298,16 @@
 | 以为卷一定能宿主 `sudo ls /var/lib/docker/volumes/...` 看到 | `ls: cannot access ...: No such file or directory` | 本机 daemon 是 **Docker Desktop**（数据在 VM 里）；「宿主」= **跑 dockerd 的那台机器** |
 | 用**相对路径**写 `-v hostdir:/data` | **静默创建了一个叫 `hostdir` 的命名卷**（`docker volume ls` 多一行），容器里 `/data` 是空的（`total 0`）—— 数据既不在宿主目录、也不在预期位置 | `-v` 的源**必须写绝对路径**（`$PWD/hostdir`）；**不以 `/` 开头 = 卷名**。更稳：`--mount type=bind,src=$PWD/hostdir,dst=/data` |
 | 把要执行的脚本/二进制放进 `--tmpfs` 目录再运行 | `Permission denied`，即使文件有 `+x` | Docker 给 tmpfs 默认挂了 **`noexec`**（`mount` 输出里能看到）。要执行得显式覆盖：`--tmpfs /tmp:rw,exec` |
+| 说「默认 bridge 里容器**不能互访**」 | 用名字访问确实失败，就以为彻底不通 | 精确说法：**能按 IP 互访**（同在 `docker0` 子网），只是**没有名字服务**。`--link` 就是拿 `/etc/hosts` 补这个缺陷 |
+| 看到 DNS 失败就以为"网络不通" | 不看 DNS 到底回的什么 | `NXDOMAIN` = **解析器正常工作，只是它不认识这个名字**（属于"名字问题"）；若为超时 / `SERVFAIL` 才是"DNS 服务器本身有问题"。两种病因完全不同 |
+| 在宿主上 `sudo iptables -t nat -L DOCKER -n` 查 DNAT | `sudo: iptables: command not found` | 两个原因叠加：① 宿主系统**没装** `iptables`（新发行版多改用 nftables）② **更根本**：daemon 在 Docker Desktop 的 **VM** 里，规则本来就不在你的宿主上。真要查：`docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` |
+| 用 `ss -ltnp` 查宿主端口却看不到进程名 | Process 列**空白**，加 `sudo` 后**仍然空白**（本机 Docker Desktop） | 普通情况：`-p` 要 root 才显示属主。本机情况不同：`docker/desktop-*` 的**端口转发组件**在宿主上暴露监听，但 `ss` 拿不到属主信息（⚠️ 这是我的**推断**，未在书里/官方文档核对）。想继续挖：`sudo lsof -i :8081`、`sudo fuser -n tcp 8081`、`ps -ef \| grep -i docker` |
+
+---
 
 ## 我的疑问
+
+> 写这里：今天没想通的、想找书/找我问的。**空白也是记录** —— 明天带着问题进 Day 5。
 
 | # | 题目 | 考点 |
 |---|---|---|
