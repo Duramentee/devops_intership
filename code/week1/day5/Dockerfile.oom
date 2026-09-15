@@ -1,0 +1,14 @@
+# 实验 3：故意制造 OOM —— 抓 Exited (137) + OOMKilled=true
+# 用法：docker build -f Dockerfile.oom -t day5-oom .
+#       docker run --rm -m 32m day5-oom
+FROM golang:1.25-alpine AS builder
+WORKDIR /src
+COPY oom/go.mod ./
+COPY oom/main.go ./
+ENV CGO_ENABLED=0
+RUN go build -o /oom .
+
+FROM alpine:3.22
+COPY --from=builder /oom /oom
+# exec 形式 → /oom 本身就是 PID 1，能直接收到信号
+ENTRYPOINT ["/oom"]

@@ -1,0 +1,4 @@
+# 实验 1-B：shell 形式 CMD（Docker 会包成 /bin/sh -c "/app/not-exist"）
+# 预期：sh 去 exec 那个文件失败 → sh 自己以 127 结束 → docker 记 Exited (127)
+FROM alpine:3.22
+CMD /app/not-exist
