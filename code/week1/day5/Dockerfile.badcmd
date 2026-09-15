@@ -1,0 +1,4 @@
+# 实验 1-A：exec 形式 CMD 指向不存在的文件
+# 预期：runc 在**创建阶段**就失败（容器可能根本没被创建出来）
+FROM alpine:3.22
+CMD ["/app/not-exist"]
