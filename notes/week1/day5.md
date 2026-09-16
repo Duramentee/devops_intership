@@ -37,30 +37,6 @@
 
 ---
 
-## 今日善后清单（收尾）
-
-| # | 事项 | 状态 |
-|---|---|---|
-| 1 | 实验容器清理 | ✅ `docker system prune` 删掉 **14 个已停止容器**（含 `Created` 的 e1a）；`kind-control-plane` 全程 Up |
-| 2 | 保留给 Day 6 用 | `day5-badcmd` / `day5-badcmd-shell` / `day5-oom` / `day5-sig` 四个镜像（做 `--cap-drop` 实验正好要用） |
-| 3 | 原始日志归档 | ✅ `code/week1/day5/logs/`：`exp1-5.log` / `exp-round2.log` / `exp6-prune.log` |
-| 4 | 脚本可复跑 | ✅ `run.sh` / `run2.sh` / `prune.sh`（各自 `cd "$(dirname "$0")"`，不依赖外部路径） |
-| 5 | 排障索引同步 | ✅ `docs/docker/05-排障索引.md` §二 新增「按退出码排障」+「Day 5 实测三条颠覆性结论」 |
-| 6 | Day 4 遗留题闭环 | ✅ 回执在 `notes/week1/day4.md` |
-| 7 | 进度表更新 | ✅ `plan/求职学习计划.md` §0 现状 + §7 勾选表（第 1 周 → 🟡 Day 1~5 完成） |
-| 8 | 遗留待查 | ⬜ 内核 `signal(7)` 的 init 保护原文、Go `dieFromSignal()` 源码（见「我的疑问」） |
-
-## 明天（Day 6）起点
-
-| 项 | 内容 |
-|---|---|
-| 主题 | 容器安全 + Dockerfile 收尾（`USER` 非 root / `--cap-drop=ALL` / `--read-only` / `.dockerignore` / `HEALTHCHECK`） |
-| 现成素材 | `webapp:v3`（12.6MB）+ 今天的 `day5-sig` 镜像（拿来试 `--cap-drop` / `--read-only`） |
-| 已埋的钩子 | ① `scratch` 里没 shell → 排障要用 `--entrypoint`（Day 3 已踩）② 今天证明了"**只有 PID 1 才谈信号语义**"③ `docker_test` 容器已被 prune 删掉（镜像还在） |
-| 每日一题预判 | 概念题：为什么"容器里是 root"比"宿主上是 root"风险低？挂 `docker.sock` / `--privileged` 后还成立吗？ |
-
----
-
 ## ⚠️ 环境阻塞：已解除（排障过程本身值得记）
 
 | 现象 | 命令 | 输出 |
@@ -240,6 +216,55 @@ Server: Docker Desktop 4.90.0 (238679)
 
 ---
 
+## 快问快答回执（12 题 · Day 5 收尾自测）
+
+> 规则：一句话一题、凭记忆答（不许翻笔记）。结果 **3 ✅ / 8 🔶 / 1 ❌**。
+> 错题**全部集中在今天刚被实测翻案的反直觉机制**上（不是基础漏洞）—— 属于"还没有第二遍记忆"。
+
+**总览**
+
+| # | 我的原答（摘要） | 判定 | 修正 |
+|---|---|---|---|
+| 1 | 默认发 SIGTERM，10 秒，`-t` 可指定，超时改发 SIGKILL | ✅ | 补：`--stop-signal` 可以换信号 |
+| 2 | 128+9 = SIGKILL，143 = 128+15 = SIGTERM | ✅ | — |
+| 3 | 不一定 OOM；`inspect` 看 `OOMKilled`，true 才是 | ✅ | 补：`false` 时还要用 `events` 排掉"stop 超时 / 人杀的" |
+| 4 | 内核发 SIGTERM，进程没装 handler 就会被忽略 | 🔶 | **漏掉最关键的前提**：只有 **PID 1** 才享受这个"忽略"保护 |
+| 5 | **143**（理由：没注册 `signal.Notify` = 没 handler → 忽略信号） | ❌ | 实测是 **`2`**（Go runtime 给所有信号都装了内部 handler）——见下方「三题一起讲」 |
+| 6 | 看是不是 143，再 `inspect` 查退出时间 | 🔶 | 判据是 **`ExitCode 0` + 善后日志**；`143` 恰恰**不是**成功 |
+| 7 | 显示"待运行/停摆"，查 log 会提示 runc 错误 | 🔶 | 状态叫 **`Created`**；而且 **`docker logs` 是空的** → 要看 `State.Error` |
+| 8 | 1，用 `inspect` 能查到 | 🔶 | 退出码是 **127**；具体信息在 **`docker logs`**（`/bin/sh: ... not found`）；`1` 是 **`docker start` 自己**的返回码 |
+| 9 | 去内核查信号，命令不知道，可能是 `sysctl` | 🔶 | `docker events --since <Start> --until <现在>`（`die` 事件带 `exitCode`）；内核层 `journalctl -k \| grep -i oom`。⚠️ **`sysctl` 是读写内核参数的**（如 `net.ipv4.ip_forward`），不是查日志的工具 |
+| 10 | 大约 48M，因为有 swap；限制就取消 swap | 🔶 | 实测 **56 MiB**（上限 = `Memory + swap` = 32 + 32 = **64 MiB**）；硬限制要写出来：`-m 32m --memory-swap 32m` |
+| 11 | exec / stats 不能用，其余可用；会骗人的"感觉是 top" | 🔶 | `exec` ❌ / **`stats` ⚠️ 能用但会骗人**（返回 `0B/0B` 且**不报错**）/ `top` ❌ / `logs`·`inspect`·`diff`·`cp` ✅。top 的"宿主视角"是**正常行为**（Day 1 用过），不是骗人 |
+| 12 | 删所有默认容器，不碰运行中的容器 | 🔶 | **删**：所有**已停止**容器 + **构建缓存** + 悬空镜像 + 未使用的自定义网络；**不碰**：运行中容器、**有 tag 的镜像**、**所有卷** |
+
+### 三题一起讲：4️⃣ + 5️⃣ + 6️⃣ 是同一个机制
+
+我的推理链是「没装 handler → 信号被忽略 → **143**」。前半句对，错在**漏掉了一个前提**：
+
+| 问题 | 正确答案 | 对应实测 |
+|---|---|---|
+| **谁**会被内核忽略"默认处置为终止"的信号？ | **只有 PID 1**（内核对 init 的保护） | 补 B：`sleep` 直接做 PID 1 → `stop` 等满 **3.29s**（信号没生效） |
+| 非 PID 1 的进程没装 handler 呢？ | **照样被杀死 → `143`** | 补 C：同一个 Go 程序做**子进程** → `Terminated` + **`CHILD-EXIT=143`** |
+| Go 做 PID 1 且没 `Notify`？ | **`2`** —— Go runtime 给**所有**信号都装了内部 handler，走 `dieFromSignal()`：置回 `SIG_DFL` → `raise(SIGTERM)` → 因是 PID 1 又被忽略 → **回退 `exit(2)`** | 4-A：`Exited (2)` |
+
+> **一句话**：`143` 只属于"**信号真的生效了**"的情况；PID 1 会把信号**吃掉**，于是结局变成 **`137`**（等超时被打死）或 **`2`**（Go 的回退码）。
+>
+> **第 6 题为什么是陷阱**：`143` 只说明"被 SIGTERM 杀死"，**善后可能压根没发生**。正确判据 = **`ExitCode 0` + 日志里有善后输出**（4-B：日志有"停止接收新连接 / 刷盘 / 注销"，码 `0`）。"看退出时间"有参考价值（4-A 是 **0.30s** 秒退 = 没善后），但**不能当主判据**。
+
+### 错题清单（要形成"第二遍记忆"的 6 条）
+
+| # | 一句话 | 之前错成 |
+|---|---|---|
+| 1 | **"信号被忽略"只在 PID 1 成立**：非 PID 1 → `143`；Go 做 PID 1 → `2`；`sleep`/`sh` 做 PID 1 → 等超时 `137` | 当成通用规律 |
+| 2 | **优雅关闭的判据 = `ExitCode 0` + 善后日志**，不是 143 | 以为 143 = 成功 |
+| 3 | **exec 形式 CMD 写错 → `Created` + `logs` 空** → 唯一线索是 `State.Error` | 以为能查 log |
+| 4 | 查"谁杀的"用 **`docker events`**（`--until` 用"现在"）+ 内核日志；**`sysctl` 不是查日志的** | 工具张冠李戴 |
+| 5 | **`docker stats` 对死容器返回 `0B/0B` 且不报错** —— 唯一"静默骗人"的命令 | 怀疑 top |
+| 6 | `prune` 不带 `-a`：**卷和有 tag 的镜像安全，构建缓存会没** | 漏了构建缓存/悬空镜像/网络 |
+
+---
+
 ## 补做 · Day 4 每日一题（已完成）
 
 → 原答 + 批改 + 正确写法已归档到 `notes/week1/day4.md` 的「Day 4 每日一题（Day 5 批改）」。
@@ -410,6 +435,9 @@ Server: Docker Desktop 4.90.0 (238679)
 | 错法 | 现象 | 正确做法 |
 |---|---|---|
 | 以为 `docker stop` 一定会得到 `143` | 实测四种结局（0 / 2 / 137 / 143），就是没有"默认 143" | 先搞清楚 **PID 1 是谁、装没装 handler**；信号被内核忽略时只能等超时 → SIGKILL |
+| 把"没装 handler → 信号被忽略"当**通用**规律 | 会推出"没 handler 就该 143"，实测全错（快问快答第 4、5 题） | 这个"忽略"保护**只对 PID 1 成立**：非 PID 1 没 handler → **143**；Go 做 PID 1（runtime 自带 handler）→ **2**；`sleep`/`sh` 做 PID 1 → 超时 **137** |
+| 用 `sysctl` 去查"谁杀了进程" | 什么都查不到 | `sysctl` 是**读写内核参数**的（如 `net.ipv4.ip_forward`）；查信号/杀进程用 `docker events` +（VM 内）`journalctl -k \| grep -i oom` |
+| 把 `docker start` 的返回码 `1` 当成容器退出码 | 记成"127 那个场景返回 1" | `docker start` 失败返回的是 **CLI 自己的** `1`；容器退出码永远看 `docker inspect -f '{{.State.ExitCode}}'` |
 | 把 `Exited (143)` 当成"优雅关闭成功" | ❌ 143 只说明被 SIGTERM 杀死 | **成功 = `ExitCode 0` + 日志有善后输出**（实测 4-B：日志有"停止接收新连接/刷盘/注销"） |
 | 把 137 一律当 OOM | 只查 `OOMKilled`，别的原因全漏了 | **137 是「被 SIGKILL」的统称**：`docker kill`、`docker rm -f`、`stop` 超时、宿主 OOM 都给 137（实测 4-C：`137` + `OOMKilled=false`）。要区分看 `OOMKilled=true` 或 `docker events` 的 `oom` 事件 |
 | 以为 `-m 32m` 就是硬限制 | 实测吃到 **56 MiB** 才死 | `MemorySwap` **默认 = 2 × `Memory`**；要硬限制就 `--memory-swap` 设成与 `-m` 相同 |
@@ -437,3 +465,31 @@ Server: Docker Desktop 4.90.0 (238679)
 | 3 | `docker stop` 的 10s 超时是 **CLI** 在计时还是 **dockerd**？`-t 0` / `-t 30` 分别会发生什么？ | 谁负责把 SIGTERM 升级成 SIGKILL | ⬜ |
 | 4 | 4-B 里 `signal.Notify` 收到的是 `terminated`（`syscall.SIGTERM.String()`）——怎么打印出 `SIGTERM` 字样更清楚？ | 小改进，日志可读性 | ⬜ 可选 |
 | 5 | `--memory-swap` 具体怎么换算（`-m 32m` + `--memory-swap 64m` 时容器最多能吃到多少）？ | cgroup v2 内存限制语义 | ⬜ 待实测 |
+
+---
+
+## 今日善后清单（收尾）
+
+| # | 事项 | 状态 |
+|---|---|---|
+| 1 | 实验容器清理 | ✅ `docker system prune` 删掉 **14 个已停止容器**（含 `Created` 的 e1a）；`kind-control-plane` 全程 Up |
+| 2 | 保留给 Day 6 用 | `day5-badcmd` / `day5-badcmd-shell` / `day5-oom` / `day5-sig` 四个镜像（做 `--cap-drop` 实验正好要用） |
+| 3 | 原始日志归档 | ✅ `code/week1/day5/logs/`：`exp1-5.log` / `exp-round2.log` / `exp6-prune.log` |
+| 4 | 脚本可复跑 | ✅ `run.sh` / `run2.sh` / `prune.sh`（各自 `cd "$(dirname "$0")"`，不依赖外部路径） |
+| 5 | 排障索引同步 | ✅ `docs/docker/05-排障索引.md` §二 新增「按退出码排障」+「Day 5 实测三条颠覆性结论」 |
+| 6 | Day 4 遗留题闭环 | ✅ 回执在 `notes/week1/day4.md` |
+| 7 | 进度表更新 | ✅ `plan/求职学习计划.md` §0 现状 + §7 勾选表（第 1 周 → 🟡 Day 1~5 完成） |
+| 8 | 遗留待查 | ⬜ 内核 `signal(7)` 的 init 保护原文、Go `dieFromSignal()` 源码（见「我的疑问」） |
+| 9 | 快问快答自测（12 题） | ✅ 结果 3✅/8🔶/1❌；回执 + 错题清单已并入本文 |
+| 10 | 笔记整理 | ✅ 顺序调整为：速览 → 任务 → 环境 → 实测 → 自测/回执 → 附录 → 四段 → 善后/明日起点（收尾全部放文末） |
+
+---
+
+## 明天（Day 6）起点
+
+| 项 | 内容 |
+|---|---|
+| 主题 | 容器安全 + Dockerfile 收尾（`USER` 非 root / `--cap-drop=ALL` / `--read-only` / `.dockerignore` / `HEALTHCHECK`） |
+| 现成素材 | `webapp:v3`（12.6MB）+ 今天的 `day5-sig` 镜像（拿来试 `--cap-drop` / `--read-only`） |
+| 已埋的钩子 | ① `scratch` 里没 shell → 排障要用 `--entrypoint`（Day 3 已踩）② 今天证明了"**只有 PID 1 才谈信号语义**"③ `docker_test` 容器已被 prune 删掉（镜像还在） |
+| 每日一题预判 | 概念题：为什么"容器里是 root"比"宿主上是 root"风险低？挂 `docker.sock` / `--privileged` 后还成立吗？ |
