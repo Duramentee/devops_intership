@@ -161,7 +161,95 @@ CMD ["/app"]
 
 ---
 
-## 八、自查清单（写完作业用）
+## 八、`USER` 与用户/组：`adduser` vs `useradd`、UID 怎么选
+
+### 8.1 `useradd` 与 `adduser` 是两个命令
+
+**结论**：`useradd` 是底层原语（shadow 工具集）；`adduser` 是上层封装 —— **Debian 系是 Perl 脚本（内部调 `useradd`）、Alpine 系是 BusyBox applet（自己实现，选项不通用）**。
+
+| 名字 | 实际身份 | 来自哪个包 | 是否调 `useradd` |
+|---|---|---|---|
+| `useradd` | shadow 工具集（C，底层） | Debian/Ubuntu: `passwd`；RHEL: `shadow-utils`；**Alpine: 需 `apk add shadow`** | — |
+| `adduser`（Debian/Ubuntu） | **Perl 脚本**封装 | `adduser` | ✅ 拼参数调 `useradd` |
+| `adduser`（Alpine/BusyBox） | **BusyBox applet** | busybox（基础镜像自带） | ❌ 独立实现 |
+
+| 维度 | `useradd` | Debian `adduser` | Alpine `adduser` |
+|---|---|---|---|
+| 交互性 | 全参数、零交互 | **默认交互**（问密码/姓名） | 交互；`-D` 变静默 |
+| 建家目录 | **默认不建**，要 `-m` | 默认建 | 默认建 |
+| 设密码 | 不设（另跑 `passwd`） | 交互设 | `-D` = 不设密码 |
+| 适合写进 Dockerfile / CI | ✅ | ❌（会卡在提示符） | ✅（配 `-D`） |
+| 组参数语义 | `-g` 主组 / `-G` 附加组 | 同 shadow | ⚠️ **`-g` 是注释、`-G` 是组 —— 与 shadow 相反** |
+
+**用法**
+
+| 实现 | 场景 | 命令 |
+|---|---|---|
+| shadow `useradd` | 普通用户 + 家目录 | `useradd -m -u 10001 -s /bin/bash app` |
+| shadow `useradd` | 系统账号（无家目录、不可登录） | `useradd -r -s /sbin/nologin svc` |
+| Debian `adduser` | 人手交互建用户 | `adduser app` |
+| Debian `adduser` | **Dockerfile 里静默建** | `adduser --disabled-password --gecos "" --uid 10001 app` |
+| Alpine `adduser` | **Dockerfile 里静默建** | `adduser -D -u 10001 app` |
+
+**按底座选（Dockerfile 里到底写哪行）**
+
+| 底座 | 写什么 | 理由 |
+|---|---|---|
+| `alpine` | `RUN adduser -D -u 10001 app` | Alpine **没有 `useradd`**（除非 `apk add shadow`，白增体积） |
+| `debian`/`ubuntu` | `RUN useradd -m -u 10001 app` | shadow 版一定在，且非交互 |
+| `scratch` | **不建用户**，只写 `USER 10001:10001` | 无 `/etc/passwd` 也无 shell；内核只看数字 |
+
+✍️ `USER 10001` **不需要 `/etc/passwd` 里有这条记录**：内核判权限只看 uid 数字；`/etc/passwd` 只影响 `id`/`whoami` 显示、`~` 展开、`getpwnam()` 类调用。
+
+### 8.2 数字的含义：UID / GID 与镜像里的号
+
+**(a) 内核层只有两个特殊值**
+
+| 数字 | 含义 |
+|---|---|
+| `0` | root；绕过一切 DAC 权限检查（不看 rwx 位） |
+| `4294967295`（2³²−1） | `(uid_t)-1`，内核保留为"无效 / 未映射" |
+| `65534` | `nobody` / `nogroup`（内核 `overflowuid`），别拿来做服务账号 |
+
+`uid_t` 是 **32 位无符号**（Linux 2.6+），有效范围 `0 ~ 4294967294`。
+
+**(b) 1000 / 100 这些线是发行版约定，不是内核规则**（写在 `/etc/login.defs`）
+
+| 区间 | Debian/Ubuntu | RHEL 系 | 用途 |
+|---|---|---|---|
+| `0` | root | root | |
+| `100–999` | `SYS_UID_MIN..SYS_UID_MAX` | `201–999` | 系统服务账号（装包时自动分配） |
+| `1000–60000` | `UID_MIN..UID_MAX` | `1000–60000` | 普通用户（人手 `adduser` 的分段） |
+
+**(c) 固定号随基础镜像变**：`33` 在 Debian 基础镜像里是 `www-data`，换个基础镜像可能是别的账号 → 用 `getent passwd 33` 查，**别背**。
+
+**(d) `10001` 是社区惯例，没有内核含义**：≥1000（落在"普通用户"区间）· 远高于发行版预置号段（跨发行版安全）· 远离内核特殊值（0/65534）· 官方文档与 K8s `runAsUser: 10001` 示例高频出现。
+
+**真正必须保证的 3 条约束**（比"选哪个数字"重要得多）
+
+| # | 约束 | 踩了会怎样 |
+|---|---|---|
+| 1 | **镜像内唯一** | `useradd` 报 `UID 10001 is not unique` |
+| 2 | **UID 和 GID 要配对写** | 只写 `USER 10001` → 进程 **gid 仍是 0（root 组）**；加固版写 `USER 10001:10001`，build 后 `docker exec <cid> id` 实测确认 |
+| 3 | **bind mount 时 UID 要和宿主数据属主对齐** | 宿主目录属主 1000、容器跑 10001 → 写不进去（非 root 化最常见的翻车点）；临时办法 `-u $(id -u):$(id -g)` |
+
+**(e) 容器特有：容器 uid 0 是否等于宿主 uid 0 取决于映射**
+
+| 查什么 | 命令 | 说明 |
+|---|---|---|
+| uid 映射表 | 容器内 `cat /proc/self/uid_map` | 默认 `0 0 4294967295` = **未启用 userns-remap，容器 0 直接对宿主 0** → 这就是"容器 root 危险"的根 |
+
+### 8.3 `USER` 的三个易错点
+
+| 坑 | 现象 | 正确做法 |
+|---|---|---|
+| `USER app` 但镜像里没这个用户 | `docker run` 报 `unable to find user app: no matching entries in passwd file` | 用数字；或确保建用户那行在 `USER` **之前** |
+| 以为 `USER` 会顺手设 `HOME` | `${HOME}` 仍指 `/root`（或为空） | `USER` 不设任何 env；需要就显式 `ENV HOME=/app` |
+| 以为 `COPY` 会尊重 `USER` | 文件属主仍是 root | 用 `COPY --chown=u:g` —— **COPY 的属主只由 `--chown` 决定** |
+
+---
+
+## 九、自查清单（写完作业用）
 
 - [ ] 每条指令的时机（构建 / 运行）我给对了吗？
 - [ ] 改动最频繁的东西放最后了吗？
@@ -169,6 +257,8 @@ CMD ["/app"]
 - [ ] 启动命令是 exec form 吗？PID 1 是服务本身吗？
 - [ ] 有没有把密钥、`.git`、本地二进制带进镜像？
 - [ ] 基础镜像 tag 是固定的吗？
+- [ ] 目标底座里有 `USER` 写的那个用户吗？（`scratch` 只能写数字）
+- [ ] `--chown` 的 uid:gid 和 `USER` 的 uid:gid 对得上吗？
 
 ## 自测
 
