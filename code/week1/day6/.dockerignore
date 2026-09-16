@@ -1,0 +1,9 @@
+.git
+Dockerfile*
+webapp
+*.log
+*.md
+.env
+
+#密钥和证书我也不知道怎么命名的, 这里用一个目录代替吧
+/secure
