@@ -34,6 +34,9 @@ package-lock.json
 # 转换出的书籍正文：体积大且涉版权，不提交
 assets/text/
 
+# 原始 PDF / 图片：同样涉版权且体积大（28MB+），不提交
+assets/pdf/
+
 # 回收目录（确认无用后自行 rm -rf .trash）
 .trash/
 
