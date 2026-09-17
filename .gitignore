@@ -37,6 +37,10 @@ assets/text/
 # 原始 PDF / 图片：同样涉版权且体积大（28MB+），不提交
 assets/pdf/
 
+# 打包/分享用的压缩包（与目录内容重复，体积大）：不提交
+/code.zip
+/使用说明.zip
+
 # 回收目录（确认无用后自行 rm -rf .trash）
 .trash/
 
