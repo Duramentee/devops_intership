@@ -1,244 +1,236 @@
-# Day 4 学习笔记 · 数据与网络
+# Day 4 · 数据持久化与容器网络
 
-> 日期：2026-09-14
-> 对应模块：`docs/k8s_in_action/01-容器与K8s入门.md` · `docs/docker/03-命令词典.md` §四（网络）/ §五（存储）
-> 参考：`docs/docker/05-排障索引.md` · `docs/linux/Linux-故障索引.md`
-> 代码目录：`code/week1/day4/`
-> 模板：概念 / 命令 / 易错点 / 我的疑问
+> 日期：2026-09-14 · 代码：`code/week1/day4/`（`emptydir/`、`hostdir/`）· 原笔记备份：`/tmp/day4-notes-backup.md`
+> 关联文档：`docs/docker/02-命令词典.md` §四（网络）/ §五（存储）· `docs/docker/04-排障索引.md` · `docs/linux/Linux-故障索引.md`
+> 环境：Docker Desktop（dockerd 运行在 **VM** 内）· Docker v28 + containerd 镜像存储
 
 ---
 
-## 今日速览（先看这 6 条）
+## 1. 结论速览
 
 | # | 结论 |
 |---|---|
-| 1 | **可写层跟「容器对象」走，不跟进程** —— `restart` 数据在；`rm`+`run` 数据丢（两次容器 ID 不同 = 铁证） |
-| 2 | **命名卷是 Docker 的独立对象**，`rm -f` 容器不影响它；**bind 就是你那个宿主目录**，Docker 只是搬运工 |
-| 3 | **空卷会预填充镜像内容；bind 只遮盖、不拷贝** —— 这条最容易混 |
-| 4 | **默认 bridge 没有名字服务**（`NXDOMAIN`）；自定义网络靠 dockerd 内嵌 DNS（`127.0.0.11`）。⚠️ 但默认 bridge **按 IP 仍能互访** |
-| 5 | **`-p 8081:8080` = 一条 DNAT**：`宿主:8081 → 容器IP:8080`（已实测到规则）+ `docker-proxy` 兜 localhost |
-| 6 | **本机是 Docker Desktop**：dockerd 在 VM 里 → 宿主看不到 `/var/lib/docker`、没有 `iptables`、`ss -ltnp` 看不到属主 |
-
-> **明天（Day 5）开头抽查**：① `run` vs `restart` 对可写层的差别 ② 卷 vs bind 谁管生命周期 ③ 默认 bridge 能否容器互访（要**精确说法**）。
-> → **已回执**（见本文末「Day 5 开场抽背回执」）：1 🔶 / 2 ✅ / 3 ✅。
+| 1 | **可写层跟随"容器对象"，不跟随进程**：`docker restart` 数据仍在；`rm` + `run` 数据丢失（两次容器 ID 不同，即新容器、新可写层） |
+| 2 | **命名卷是 Docker 的独立对象**，`rm -f` 容器不影响它；**bind mount 就是宿主机上的普通目录**，Docker 不管理其生命周期 |
+| 3 | **空卷会预填充镜像内容；bind mount 只是遮盖、不拷贝** —— 这两条最容易混 |
+| 4 | **默认 bridge 没有名字服务**（`NXDOMAIN`）；自定义网络由 dockerd 内嵌 DNS（`127.0.0.11`）提供。⚠️ 但默认 bridge **按 IP 仍可互访** |
+| 5 | **`-p 8081:8080` 本质是一条 DNAT 规则**：`宿主机:8081 → 容器IP:8080`（已实测到规则），另有 `docker-proxy` 处理 localhost 路径 |
+| 6 | **本机是 Docker Desktop**：dockerd 在 VM 内 → 宿主看不到 `/var/lib/docker`、没有 `iptables`、`ss -ltnp` 看不到端口属主 |
 
 ---
 
-## 今日任务清单
+## 2. 机制
 
-| # | 任务 | 完成 |
-|---|---|---|
-| 1 | 可写层：写文件 → `rm -f` → 重建，数据没了 | ✅ |
-| 2 | 命名卷：`-v webvol:/data`，数据还在 | ✅ |
-| 3 | bind mount：宿主目录双向对比 | ✅ |
-| 4 | tmpfs：容器停即失 | ✅ |
-| 5 | 默认 bridge 解析**失败** → `mynet` **成功** | ✅ |
-| 6 | `mynet` 内不写 `-p`，用容器名访问服务 | ✅ |
-| 7 | 端口三视角：`docker port` / `ss -ltnp` / 容器内 `netstat` | ✅ |
-| 8 | 结论写进本笔记四段 | ⬜ |
+### 2.1 可写层的本质与生命周期
 
-> 存储（1~4）+ 网络（5~7）已闭环；只剩 8：四段收尾 + 两道每日一题（留到明天）。
+可写层**不是内存**，而是磁盘上的一个真实目录：它是 overlay **联合挂载**的 `upperdir`（`lowerdir` = 镜像只读层，`upperdir` = 可写层，`merged` = 容器看到的 rootfs）。
 
----
-
-## 实测记录
-
-### 数据持久化对照
-
-| 启动方式 | `docker rm -f` 后数据 | `docker restart` 后数据 | 谁管理生命周期 | 落点 |
-|---|---|---|---|---|
-| 不挂载（可写层） | **没了**（`No such file or directory`） | **还在**（实测 `hello`；`stop`+`start` 后同样在） | **容器对象** | 磁盘上的目录：老后端 `/var/lib/docker/overlay2/<id>/diff`；本机是 containerd snapshotter（见易错点） |
-| `-v webvol:/data` | **还在**（`cat /data/x` → `v1`，容器 ID 已换新） | 在 | **卷对象（独立）**，`docker volume rm` 才删 | daemon 所在机器的 `/var/lib/docker/volumes/webvol/_data`（本机在 VM 里，⚠️ 见下方陷阱） |
-| `-v $PWD/hostdir:/data` | **还在**（它就是宿主上的普通目录，跟容器无关） | 在 | **你 / 操作系统**（Docker 不管） | 宿主 `$PWD/hostdir` 本身 |
-| `--tmpfs /tmp` | 没了（容器没了，挂载也没了） | **没了**（实测 `cat: can't open '/tmp/t'`） | 容器**本次启动**（内存） | kernel 的 **tmpfs**：`df` 显示 `tmpfs 5.8G`，`mount` 显示 `type tmpfs (rw,nosuid,nodev,noexec,relatime)` |
-
-**A/B 铁证**：`restart` 同一容器 → `f14de7de…`（ID 不变）数据**在**；`rm` + `run` → `cb8920ae…` → `cb9ce3b1…`（**ID 换了**）数据**丢**。两次 ID 不同 = 新容器、新可写层。
-⚠️ `docker diff` 要**在写完文件之后、删容器之前**跑才看得到 `A /data.txt`。
-
-**⚠️ 环境陷阱：宿主上找不到 `/var/lib/docker`** —— 本机是 **Docker Desktop**，`dockerd` 跑在 **VM 里**，`Mountpoint` 是 **VM 内部**路径 → 宿主 `sudo ls` 必然报 `No such file or directory`。
-→ 「卷 = 宿主上的目录」里的**「宿主」= 跑 dockerd 的那台机器**，不是你的本地 shell。
-想看卷里文件：`docker run --rm -v webvol:/data alpine:3.22 ls -l /data`（通吃所有环境）。
-
-### 网络对照
-
-| 场景 | 现象 | 命令 |
-|---|---|---|
-| 默认 bridge，用容器名解析 | `** server can't find n1: NXDOMAIN`；`wget: bad address 'n1:8080'` | `docker run --rm alpine:3.22 nslookup n1` |
-| `mynet`，用容器名解析 | `Server: 127.0.0.11` → `Name: n1 / Address: 172.19.0.2` | `docker run --rm --network mynet alpine:3.22 nslookup n1` |
-| `mynet` 内访问 `http://w1:8080`（**无 `-p`**） | `<h1>Hello DevOps</h1>` | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` |
-
-**`/etc/resolv.conf` 一行之差（今天的题眼）**
-
-| 网络 | nameserver | 注释里的线索 |
-|---|---|---|
-| 默认 `bridge` | `192.168.65.7` | `(legacy)` —— 直接抄宿主（Docker Desktop VM）的 DNS，**没有名字服务** |
-| `mynet` | **`127.0.0.11`** | `(internal resolver)` + `ExtServers: [host(192.168.65.7)]` + `options ndots:0` —— **dockerd 的内嵌解析器**，非本网络的域名转发给上游 |
-
-### 端口三视角（`-p 8081:8080`）
-
-| 视角 | 命令 | 输出 |
-|---|---|---|
-| 宿主侧监听 | `sudo ss -ltnp \| grep 8081` | `LISTEN *:8081` —— ⚠️ **连 sudo 也看不到进程名**（Docker Desktop 的转发组件，见易错点） |
-| 映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081` + `[::]:8081`（**左=容器，右=宿主**，与 `-p` 顺序相反） |
-| 容器内谁在听 | `docker exec d4p netstat -tlnp` | `tcp :::8080 LISTEN 1/webapp` ← 容器内是 **8080**，PID 1 = 应用本身 |
-| **DNAT 规则** | `docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` | ✅ 实测 `Chain DOCKER (2 references)` + `DNAT tcp dpt:8081 to:172.17.0.2:8080` ← **直接验证「宿主:8081 → 容器IP:8080」** |
-| 没写 `-p` 时从宿主访问 | `curl localhost:8080` | **`curl: (7)`** = 找不到门（宿主没人 listen） |
-| 容器删掉之后 | `docker rm -f d4p && sudo ss -ltnp \| grep 8081`；`docker port d4p` | 宿主监听**变空**（跟着容器走）；`docker port` → `Error response from daemon: No such container: d4p` |
-
----
-
-## 步骤 1~3 总结 · 存储（可写层 / 命名卷 / bind mount）
-
-### 一句话分清 / 怎么选
-
-| 存储 | 谁管（谁记得这份数据） | **空目录时** | 什么时候用 |
-|---|---|---|---|
-| **可写层** | **容器对象** | — | 数据跟容器一起死就行 |
-| **命名卷** | **Docker**（`docker volume rm`） | **预填充镜像内容** | 数据要比容器活得久、且让 Docker 统一管 |
-| **bind mount** | **你 / 操作系统**（`rm -rf`） | **无条件遮盖** | 数据本来就在宿主（源码/配置），要边改边生效 |
-| **匿名卷** | Docker（`rm -v` / `prune` 的清理对象） | 同命名卷 | 一般不用，易被连带删 |
-| **tmpfs** | 容器**本次启动**（内存） | — | 密钥 / 临时缓存，绝不能落盘 |
-
-### 关键证据（一句话各一条）
-
-| 实验 | 结论 + 铁证 |
+| 问题 | 答案 |
 |---|---|
-| 可写层 | 跟**容器对象**走，不跟进程 —— `restart` ID 不变数据在；`rm`+`run` ID 换了数据丢 |
-| 命名卷 | **独立于容器** —— `rm -f` 后 `webvol` 还在；重建容器 `cat /data/x` → `v1` |
-| bind | **同一份数据、不拷贝** —— 双向即时生效；空宿主目录挂 `/app` → `total 0` |
-| 空卷 | **预填充镜像内容** —— `-v webvol2:/app` → `webapp` **8037381** 字节（= Day 3 那个二进制） |
+| 为什么随容器删除而消失 | 它的生命周期绑定**容器对象**（不绑定进程）：`docker rm` 删除容器对象时，dockerd 把该目录一并删除 |
+| 怎么看到它的真实路径 | 容器自己就能报告：`docker run --rm webapp:v2 sh -c 'grep -o "upperdir=[^,]*" /proc/mounts'` |
+| 为什么不能用 `GraphDriver` 字段查 | 本机是 containerd 镜像存储，该字段不存在（报 `map has no entry for key "GraphDriver"`），不是命令写错；用 `docker diff` / `docker info -f '{{.Driver}}'` 替代 |
+| 它和卷的形式是否相像 | 都是宿主/VM 文件系统上的普通目录。区别在归属：可写层按**容器 ID**索引、只属于该容器且是 rootfs 的一层；卷按**卷名**索引、可被多个容器同时挂载 |
 
-### 实测：`dangling` 的判据
+### 2.2 四种挂载方式对照
 
-`7fe3c1c0…` 属于 **`kind-control-plane`**（已停止，`Exited (128)`）→ 它**不出现**在 `-f dangling=true` 里。
-→ **`dangling = 没有任何容器（含已停止的）引用`**。
-⚠️ **别删 `7fe3c1c0…`**：那是 kind 集群的数据卷，第 2 周要用。
-
----
-
-## 抽背回执（Day 3 的坑）
-
-| # | 判定 | 要点 |
-|---|---|---|
-| 1 | ✅ | 「隔离」而非「删除」：最终镜像 rootfs 从**最后一个 `FROM`** 算起，builder 层只在 build cache 里，`COPY --from` 是唯一通道 |
-| 2 | 🔶 | `-p` 左=宿主、右=容器 ✅；`curl (56)` 未答 → 见下表 |
-| 3 | 🔶 | `scratch` 代价只答出「没有 shell」；完整 = **shell / CA 证书 / tzdata**（+`/etc/passwd`）。补救已在 `notes/week1/day3.md`，本笔记不重复 |
-
----
-
-## 排障速查：`curl` 退出码
-
-→ 完整表见 `docs/docker/05-排障索引.md` §二「curl 退出码」（7/56/28/52/6 + 口诀 + 为什么 localhost 走 docker-proxy 会看到 56）。
-
-**一句话版**：**7 = 找不到门；56 = 门开了但屋里没人；28 = 敲门没人应也没人拒；52 = 有人应了但一句话不说。**
-
----
-
-## 预判对账（开场 5 条）
-
-| # | 预判 | 判定 |
-|---|---|---|
-| 1 | 不挂载 → `rm -f` 后 `/data.txt` **不在** | ✅ |
-| 2 | 挂 `webvol` 重建容器 → 数据**在** | ✅ |
-| 3 | 默认 `bridge` 里解析 `n1` | ✅（重答：**报错** —— 没有名字服务） |
-| 4 | `mynet` 里**不写 `-p`** → `wget http://w1:8080` | ✅（重答：**通** —— 同子网直连） |
-| 5 | 宿主 `ss -ltnp \| grep 8081` 显示谁 → docker-proxy | ✅ |
-
-> 3、4 首次未答，根因是**网络基础为零**（不知道「网桥」是什么）；补完即对。
-
----
-
-## 网络核心模型（6 层一张表）
-
-**起点**：net namespace 隔离的是**整套网络栈**（网卡 + 路由表 + ARP + 端口表 + iptables）。两个互相看不见的网络栈怎么通信？**用「线」连起来。**
-
-| 层 | 类比 | 实体 | 机制 |
+| 存储 | 谁管理生命周期 | 空目录时的行为 | 适用场景 |
 |---|---|---|---|
-| 1 | 一根网线 | **veth pair** | 成对虚拟网卡：一端在容器（`eth0`），一端在宿主并**插在网桥上** |
-| 2 | 一台交换机 | **Linux bridge**（`docker0` / `br-xxx`） | 纯二层、只认 MAC；它的「端口」就是插上来的 veth |
-| 3 | 门牌 + 邮局 | **IP / 子网 / 网关 / 路由** | 网桥**自己也有 IP**（如 `172.17.0.1/16`）= 网关；容器从子网分到 `172.17.0.2` |
-| 4 | 出小区的快递 | **SNAT（MASQUERADE）** | 出口链改**源**地址为宿主 IP → 容器才能上公网 |
-| 5 | 小区门卫代收 | **DNAT（`-p`）** | 把「宿主:8081」的**目的**地址改写成「容器IP:8080」 |
-| 6 | 通讯录 | **DNS** | 把「容器名」翻成 IP |
+| **可写层** | 容器对象 | — | 数据与容器同生共死即可 |
+| **命名卷** | Docker（`docker volume rm`） | **预填充镜像内容** | 数据要比容器活得久，且希望由 Docker 统一管理 |
+| **bind mount** | 用户 / 操作系统（`rm -rf`） | **无条件遮盖** | 数据本来就在宿主机（源码 / 配置），需要边改边生效 |
+| **匿名卷** | Docker（`rm -v` / `prune` 可清理） | 同命名卷 | 一般不主动使用，容易被连带删除 |
+| **tmpfs** | 容器**本次启动**（内存） | — | 密钥、临时缓存，不允许落盘 |
+
+**四层生命周期对照（`stop` / `restart` / `rm` 的分界）**
+
+| 对象 | 生命周期跟谁走 | `stop` / `start` | `restart` | `rm` | 删镜像 |
+|---|---|---|---|---|---|
+| 镜像**只读层** | 镜像 | 在 | 在 | 在 | **消失** |
+| 容器**可写层** | **容器对象** | 在 | 在 | **消失** | 无关（容器已删） |
+| **命名卷** | 独立（除非 `docker rm -v`） | 在 | 在 | 在 | 在 |
+| **bind mount** | 宿主目录 | 在 | 在 | 在 | 在 |
+| **tmpfs** | 容器本次启动（内存） | **消失** | **消失**（重新挂载空 tmpfs） | 消失 | — |
+| 容器内**进程** | 进程 | 结束 | 结束 + 重启（新 PID 1） | 结束 | — |
+
+⚠️ 关键区分：`docker run` = **新建容器**（新可写层）；`docker restart` = **重启同一个容器**（可写层不变）。把两者混为一件事，就会得出"重启数据也会丢"的错误结论。
+
+### 2.3 `docker rm` / `docker rm -f` 删除的内容
+
+| 命令 | 行为 |
+|---|---|
+| `docker rm`（容器运行中） | 被 daemon 拒绝：`container is running: stop the container before removing or force remove` |
+| `docker rm -f` | 先对 PID 1 发 **SIGKILL**，再删除容器对象及其可写层（含日志、netns）；**不涉及镜像** |
+
+### 2.4 容器网络模型
+
+起点：net namespace 隔离的是**整套网络栈**（网卡 + 路由表 + ARP + 端口表 + iptables）。两个互相不可见的网络栈如何通信？**用虚拟链路连接起来。**
+
+| 层 | 实体 | 机制 |
+|---|---|---|
+| 1 | **veth pair** | 成对虚拟网卡：一端在容器内（`eth0`），另一端在宿主机并**插在网桥上** |
+| 2 | **Linux bridge**（`docker0` / `br-xxx`） | 二层转发，只识别 MAC；它的"端口"就是插上来的 veth |
+| 3 | **IP / 子网 / 网关 / 路由** | 网桥本身也有 IP（如 `172.17.0.1/16`），即容器看到的网关；容器从该子网分配到 `172.17.0.2` |
+| 4 | **SNAT（MASQUERADE）** | 出口链改写**源**地址为宿主 IP → 容器才能访问公网 |
+| 5 | **DNAT（`-p`）** | 把"宿主机:8081"的**目的**地址改写为"容器IP:8080" |
+| 6 | **DNS** | 把容器名解析成 IP |
 
 **三个必须记住的结论**
 
 | # | 结论 |
 |---|---|
-| 1 | **宿主不是容器网络的「另一个端口」**，它是**通过网桥的 IP（= 网关）**参与这张网 |
-| 2 | **名字解析**：默认 `bridge` **没有名字服务**；`--link` 是往 `/etc/hosts` **硬写一行**（静态、单向 → 被淘汰）；自定义网络靠容器内 `resolv.conf` 的 `nameserver 127.0.0.11` —— dockerd 的**内嵌 DNS**（不是真有个 DNS 进程，是 Docker 用 iptables **劫持**这个地址转给 dockerd），名字与容器**实时同步** |
-| 3 | **`-p` 只服务于「外面/宿主 → 容器」**；容器之间同子网**直连**，不用 `-p` |
+| 1 | 宿主机不是容器网络的"另一个端口"，它是**通过网桥的 IP（即网关）**参与这张网 |
+| 2 | **名字解析**：默认 `bridge` 没有名字服务；`--link` 是往 `/etc/hosts` **静态写入一行**（单向、已淘汰）；自定义网络依赖容器 `resolv.conf` 中的 `nameserver 127.0.0.11` —— dockerd 的**内嵌 DNS**（不是独立 DNS 进程，而是 Docker 用 iptables 劫持该地址转给 dockerd），名字与容器**实时同步** |
+| 3 | **`-p` 只服务于「宿主机/外部 → 容器」**；容器之间同子网**直连**，不需要 `-p` |
 
 **两个方向、两张表**
 
-| 方向 | 表 / 链 | 动作 | 改的是 |
+| 方向 | 表 / 链 | 动作 | 改动字段 |
 |---|---|---|---|
 | 容器 → 外网 | nat/**POSTROUTING** | SNAT | **源**地址 |
-| 外网 / 宿主 → 容器 | nat/**PREROUTING + DOCKER** | DNAT | **目的**地址 |
+| 外部 / 宿主 → 容器 | nat/**PREROUTING + DOCKER** | DNAT | **目的**地址 |
 
-**观测命令**
+### 2.5 名字解析：默认 bridge 与自定义网络的差别
 
-| 看什么 | 命令 |
-|---|---|
-| 网络细节（子网 / 网关 / 成员） | `docker network inspect bridge` / `mynet` |
-| 网桥本身 | `ip -br addr show docker0` |
-| 容器视角：路由 / DNS | `docker exec n1 ip route`；`docker exec n1 cat /etc/resolv.conf` |
-| DNAT 规则 | `docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` | ⚠️ 宿主上直接跑 `iptables` 会 `command not found`（规则在 VM 里） |
-| 容器挂在哪些网络 | `docker inspect -f '{{json .NetworkSettings.Networks}}' n1` |
-
-**失败模式**
-
-| 现象 | 机制 | 先查 |
+| 网络 | 容器 `/etc/resolv.conf` 的 nameserver | 注释中的线索 |
 |---|---|---|
-| 名字解析不出 | 该网络没有名字服务（默认 bridge） | `docker inspect -f '{{json .NetworkSettings.Networks}}' n1` |
-| 能解析但连不上 | **名字通了 ≠ 服务在听** | `docker exec w1 netstat -tlnp` |
-| 宿主 `curl localhost:8081` 不通 | DNAT / proxy 没写，或应用端口不对 | `docker port`；`ss -ltnp \| grep 8081` |
-| 容器出不了网 | SNAT / 转发开关 | `iptables -t nat -L POSTROUTING -n`；`sysctl net.ipv4.ip_forward` |
+| 默认 `bridge` | `192.168.65.7` | `(legacy)` —— 直接沿用宿主（Docker Desktop VM）的 DNS，**没有名字服务** |
+| `mynet` | **`127.0.0.11`** | `(internal resolver)` + `ExtServers: [host(192.168.65.7)]` + `options ndots:0` —— dockerd 的内嵌解析器，非本网络的域名转发给上游 |
+
+### 2.6 `-p 8081:8080` 的实质
+
+实测规则（在 VM 的 netns 中查到）：`Chain DOCKER (2 references)` → `DNAT tcp dpt:8081 to:172.17.0.2:8080` —— 即"目的为宿主 `8081` 的包，把目的地址改写为容器 IP 的 `8080`"。`(2 references)` 说明该链被引用两次（`PREROUTING` 处理外部流量 + `OUTPUT` 处理本机/localhost 流量）。此外 dockerd 会让 **`docker-proxy`** 在宿主端口上真实 listen，负责 iptables 处理不好的路径（这也是 localhost 访问失败时报 `curl: (56)` 而非 `(7)` 的原因）。
+
+**容器内的 8080 与宿主的 8081 属于两个 net namespace**：前者是应用 listen 的端口，后者是 DNAT 规则 + docker-proxy 的入口。
+
+### 2.7 tmpfs 的两个特性
+
+| 特性 | 说明 |
+|---|---|
+| 默认带 `noexec` | 把脚本/二进制放进 `/tmp` 再执行会 `Permission denied`（即使有 `+x`）；需要执行时写 `--tmpfs /tmp:rw,exec` |
+| 写入计入 cgroup 内存 | `docker run -m 512m --tmpfs /tmp` 写满会触发 OOM Kill（137）；实测 `df` 显示 `Size 5.8G` = 可用内存的一半 |
 
 ---
 
-## Day 5 开场抽背回执（Day 4 内容）
+## 3. 命令
 
-| # | 我的原答（摘要） | 判定 | 修正 / 补充 |
-|---|---|---|---|
-| 1 | 「两者没区别：`run` 之后再 `restart` 不丢可写层；用 tmpfs 才会丢」 | 🔶 **数据层对，答非所问** | 问的是**差别**，差别在**对象层**：`restart` = 重启**同一个容器对象**（`Id` 不变、可写层原地不动、**没有能力**换镜像/端口/挂载）；`rm`+`run` = **造新对象**（`Id` 换、新可写层、旧的连数据一起删）。<br>**一眼分辨的铁证**：`docker ps -a --format '{{.ID}} {{.CreatedAt}}'`。tmpfs 补充 ✅，但它属于**挂载类型**这一维，比可写层更短命（`restart` 也丢） |
-| 2 | 「命名卷生命周期归 Docker，bind 归用户（操作系统的普通目录）；空卷能看到容器内目录内容，bind 是遮盖，看到的仍是空目录」 | ✅ **满分** | 补三点：① 卷是**独立对象**，容器删了它还在，只有 `docker volume rm` / `volume prune -a` 才删（`docker rm -v` 只连带删**匿名**卷）② 「宿主机」= **跑 dockerd 的那台机器**（本机 Docker Desktop → 在 VM 内，宿主 shell 看不到）③ bind 源写**相对路径**会**静默变成命名卷** |
-| 3 | 「可以互相访问：默认 bridge 无内置 DNS，但可按 **IP** 访问；自建 bridge（自定义网络）由 Docker 提供 DNS，可按**主机名**访问，也能按 IP」 | ✅ **满分**（精确说法） | 补三点：① 内嵌 DNS **不是独立进程** —— 是 dockerd 在 `127.0.0.11` 应答（容器 `resolv.conf` 里那行），非本网络域名转发给宿主 DNS ② 默认 bridge 的补丁是 `--link`：往 `/etc/hosts` **硬写一行**，静态、单向、已淘汰 ③ 按 IP 互访的前提是**同在 `docker0` 子网** |
+| 场景 | 命令 | 说明 |
+|---|---|---|
+| 建卷 / 看卷 | `docker volume create webvol`；`docker volume ls` | `create` 返回**卷名** |
+| 看卷落点 | `docker volume inspect -f '{{.Mountpoint}}' webvol` | 该路径属于 **daemon 所在的机器**（Docker Desktop 在 VM 内，宿主看不到） |
+| 查看卷内容（绕开宿主路径） | `docker run --rm -v webvol:/data alpine:3.22 ls -l /data` | 通用于所有环境 |
+| 往卷里写（避免 CMD 干扰实验） | `docker exec <容器> sh -c 'echo v1 > /data/x'` | 用 exec 写，CMD 只保留 `sleep 600` |
+| 看悬空卷 | `docker volume ls -f dangling=true` | 没有被任何容器（含已停止）引用的卷 |
+| 查某个卷被谁占用 | `docker ps -a --filter volume=<卷名或ID>` | 排查匿名卷归属 |
+| 清悬空卷 | `docker volume prune` | 默认**只删匿名卷**（命名卷需 `-a`） |
+| bind mount 双向验证 | `docker run --rm -v $PWD/hostdir:/data webapp:v2 cat /data/f.txt` | 宿主写入 → 容器立即可见 |
+| 对照：bind 不拷贝 | `docker run --rm -v $PWD/emptydir:/app webapp:v2 ls -l /app` → `total 0` | 对比空卷 `-v webvol2:/app` → 有 `webapp`（8037381 字节） |
+| 更安全的挂载写法 | `--mount type=bind,src=$PWD/hostdir,dst=/data` | 显式声明类型，无"被当作卷名"的歧义 |
+| 临时内存盘 | `docker run --tmpfs /tmp webapp:v2 sh -c 'df -h /tmp; mount \| grep /tmp'` | 容器停止/重启即失效；默认带 `noexec` |
+| 指定大小 / 权限 | `--tmpfs /tmp:rw,size=64m,mode=1777` | 默认 size 为内存的一半 |
+| 发布端口 | `docker run -d -p 8081:8080 --name d4p webapp:v2` | **左 = 宿主机，右 = 容器** |
+| 看映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081`（左 = 容器、右 = 宿主，与 `-p` 顺序相反） |
+| 查宿主侧监听 | `sudo ss -ltnp \| grep 8081` | 本机（Docker Desktop）加 `sudo` 也看不到属主，只有 `LISTEN *:8081` |
+| 查容器内监听 | `docker exec d4p netstat -tlnp` | `:::8080 LISTEN 1/webapp`（`:::` = IPv6 通配 + 双栈，同时收 IPv4） |
+| 自定义网络内按名字访问 | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` | 不需要 `-p` |
+| 看网络细节 | `docker network inspect mynet`；`ip -br addr show docker0` | 子网 / 网关 / 成员 / 网桥地址 |
+| 看容器挂在哪些网络 | `docker inspect -f '{{json .NetworkSettings.Networks}}' n1` | 排查"名字解析不出"的第一步 |
 
 ---
 
-## Day 4 每日一题（Day 5 批改）
+## 4. 实测数据（原始输出）
 
-### 容器题 · 排障题
+### 4.1 持久化对照
 
-现象：「**重启容器后应用配置全丢**」。至少 3 个可能原因 + 每个的**验证命令**。
+| 启动方式 | `docker rm -f` 后数据 | `docker restart` 后数据 | 谁管理生命周期 | 落点 |
+|---|---|---|---|---|
+| 不挂载（可写层） | **丢失**（`No such file or directory`） | **仍在**（`hello`；`stop`+`start` 同样在） | **容器对象** | 磁盘目录：老后端 `/var/lib/docker/overlay2/<id>/diff`；本机为 containerd snapshotter |
+| `-v webvol:/data` | **仍在**（`cat /data/x` → `v1`，容器 ID 已更换） | 在 | **卷对象（独立）**，`docker volume rm` 才删 | daemon 所在机器的 `/var/lib/docker/volumes/webvol/_data` |
+| `-v $PWD/hostdir:/data` | **仍在** | 在 | 用户 / 操作系统 | 宿主 `$PWD/hostdir` 本身 |
+| `--tmpfs /tmp` | 丢失 | **丢失**（`cat: can't open '/tmp/t'`） | 容器本次启动（内存） | kernel tmpfs：`df` 显示 `tmpfs 5.8G`，`mount` 显示 `type tmpfs (rw,nosuid,nodev,noexec,relatime)` |
 
-**我的答案（原答）：**
+**直接证据**：`restart` 同一容器 → `f14de7de…`（ID 不变）数据**在**；`rm` + `run` → `cb8920ae…` → `cb9ce3b1…`（ID 更换）数据**丢**。ID 不同即新容器、新可写层。
+⚠️ `docker diff` 必须在"写完文件之后、删除容器之前"执行，才能看到 `A /data.txt`。
 
-1. 配置写到 **tmpfs** → 用 `docker inspect` 看容器是否用了 tmpfs
+**环境限制**：宿主上找不到 `/var/lib/docker` —— dockerd 运行在 Docker Desktop 的 **VM** 内，`Mountpoint` 是 VM 内部路径，宿主 `sudo ls` 必然报 `No such file or directory`。**"宿主机" = 运行 dockerd 的那台机器**，不是你的本地 shell。
+
+### 4.2 网络解析对照
+
+| 场景 | 现象 | 命令 |
+|---|---|---|
+| 默认 bridge，按容器名解析 | `** server can't find n1: NXDOMAIN`；`wget: bad address 'n1:8080'` | `docker run --rm alpine:3.22 nslookup n1` |
+| `mynet`，按容器名解析 | `Server: 127.0.0.11` → `Name: n1 / Address: 172.19.0.2` | `docker run --rm --network mynet alpine:3.22 nslookup n1` |
+| `mynet` 内访问 `http://w1:8080`（**无 `-p`**） | `<h1>Hello DevOps</h1>` | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` |
+
+### 4.3 端口三视角（`-p 8081:8080`）
+
+| 视角 | 命令 | 输出 |
+|---|---|---|
+| 宿主侧监听 | `sudo ss -ltnp \| grep 8081` | `LISTEN *:8081` —— 加 `sudo` 也看不到进程名（Docker Desktop 的端口转发组件） |
+| 映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081` + `[::]:8081` |
+| 容器内监听 | `docker exec d4p netstat -tlnp` | `tcp :::8080 LISTEN 1/webapp` |
+| **DNAT 规则** | `docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` | `Chain DOCKER (2 references)` + `DNAT tcp dpt:8081 to:172.17.0.2:8080` |
+| 未写 `-p` 时从宿主访问 | `curl localhost:8080` | `curl: (7)`（宿主无人 listen） |
+| 容器删除后 | `docker rm -f d4p` 后再查 | 宿主监听**变空**；`docker port d4p` → `No such container` |
+
+### 4.4 `dangling` 的判定
+
+`7fe3c1c0…` 属于 **`kind-control-plane`**（已停止，`Exited (128)`）→ **不出现**在 `-f dangling=true` 结果中。
+→ **`dangling` = 没有被任何容器（含已停止）引用**。
+⚠️ 不要删除 `7fe3c1c0…`：那是 kind 集群的数据卷，第 2 周需要。
+
+---
+
+## 5. 易错点
+
+| 错法 | 现象 | 正确做法 |
+|---|---|---|
+| 认为 `docker restart` 也会丢数据 | 得出"可写层像内存、一停就没"的错误结论 | `restart` = 重启**同一个容器**，可写层不变；`run` 才是新建容器 |
+| 用 `docker inspect -f '{{.GraphDriver.Data.UpperDir}}'` 查可写层 | `template parsing error: map has no entry for key "GraphDriver"` | 该字段在本机后端不存在（containerd 镜像存储）。替代：`docker diff <容器>` / `docker info -f '{{.Driver}}'` |
+| 用"CMD 里带 `echo > /data.txt`"的容器测 restart | 看起来数据"还在"，实际是 PID 1 重启后重新写了一遍，实验无效 | 测持久化时文件必须用 `docker exec` 从外部写入，CMD 只保留 `sleep 600` |
+| 认为 `docker volume prune` 会删命名卷 | 实测 `Total reclaimed space: 0B`，已悬空的命名卷 `webvol2` 仍在 | 默认**只删匿名卷**；要连命名卷一起删用 `docker volume prune -a` |
+| 认为卷一定能在宿主 `sudo ls /var/lib/docker/volumes/...` 看到 | `ls: cannot access ...: No such file or directory` | 本机 dockerd 在 VM 内；"宿主机" = 运行 dockerd 的那台机器 |
+| 用**相对路径**写 `-v hostdir:/data` | **静默创建了一个名为 `hostdir` 的命名卷**，容器内 `/data` 为空（`total 0`） | `-v` 的源必须写绝对路径（`$PWD/hostdir`）；**不以 `/` 开头即视为卷名**。更稳妥：`--mount type=bind,src=...` |
+| 把要执行的脚本/二进制放进 `--tmpfs` 目录再运行 | `Permission denied`，即使文件有 `+x` | Docker 给 tmpfs 默认挂 `noexec`；需显式覆盖 `--tmpfs /tmp:rw,exec` |
+| 说"默认 bridge 里容器不能互访" | 用名字访问确实失败，就以为完全不通 | 精确说法：**能按 IP 互访**（同在 `docker0` 子网），只是**没有名字服务**；`--link` 就是往 `/etc/hosts` 补这一行 |
+| 看到 DNS 失败就认为"网络不通" | 不看解析器实际返回什么 | `NXDOMAIN` = 解析器工作正常，只是不认识该名字（名字问题）；超时 / `SERVFAIL` 才是 DNS 服务器本身有问题 |
+| 在宿主执行 `sudo iptables -t nat -L DOCKER -n` | `sudo: iptables: command not found` | 两个原因叠加：① 宿主未安装 `iptables`（新发行版多用 nftables）② 更根本的是 daemon 在 VM 内，规则不在宿主。正确做法：`docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` |
+| 用 `ss -ltnp` 查宿主端口却看不到属主 | Process 列为空，加 `sudo` 后仍为空（Docker Desktop） | 一般情况 `-p` 需 root 才显示属主；本机是端口转发组件在宿主上暴露监听，`ss` 取不到属主（✍️ 此为本机推断，未核对官方文档） |
+
+---
+
+## 6. 每日一题（面试自测）
+
+### 6.1 容器题：重启容器后应用配置全丢
+
+**我的原答**
+
+1. 配置写到 **tmpfs** → 用 `docker inspect` 看是否用了 tmpfs
 2. 配置写进**可写层**了、然后 `rm -f` + `run` → 也用 `docker inspect` 看启动参数
-3. （想不出第三条）
+3. （未能给出第三条）
 
 **批改：2/3**
 
-| 原因 | 判定 | 收紧后的正确表述 | 验证命令 |
+| 原因 | 判定 | 收紧后的表述 | 验证命令 |
 |---|---|---|---|
 | ① 配置在 tmpfs | ✅ | 一致 | `docker inspect -f '{{json .Mounts}}' 名` → 找 `"Type":"tmpfs"` |
-| ② 写在可写层 | 🔶 **表述有漏洞** | ⚠️ 可写层在 `restart` 时**不丢**！必须是「写可写层 **且容器被重建**」（`rm`+`run` / `compose up` 重建） | `docker ps -a --format '{{.ID}} {{.CreatedAt}}'` 看 ID 是否换了；Mounts 是否为空 |
-| ③ **（缺）** 配置在**构建时就烤进镜像** | — | 运行期改的是可写层那份副本，容器一重建就**回到镜像里的旧值** | `docker run --rm 镜像:tag cat /app/config.yaml`（绕过容器看镜像里那份）；`docker history 镜像` 找 COPY 配置的那层 |
+| ② 写在可写层 | 🔶 表述有漏洞 | ⚠️ 可写层在 `restart` 时**不丢**，必须是「写可写层**且容器被重建**」（`rm`+`run` / `compose up` 重建） | `docker ps -a --format '{{.ID}} {{.CreatedAt}}'` 看 ID 是否更换；Mounts 是否为空 |
+| ③ **（遗漏）** 配置在**构建时写入镜像** | — | 运行期改的是可写层中的副本，容器重建后回到镜像中的旧值 | `docker run --rm 镜像:tag cat /app/config.yaml`（绕过容器看镜像中的那份）；`docker history 镜像` 找 COPY 配置的那层 |
 
-**另外两条高频原因**（面试常考）：
+**另外两条高频原因（面试常考）**
 
 | 原因 | 机制 | 验证 |
 |---|---|---|
-| 配置从**环境变量**读，重建时忘带 `-e` / `--env-file` | 配置不在文件里、在容器环境里，重建即失 | `docker inspect -f '{{json .Config.Env}}' 名`，对比 `docker history` 的 `ENV` 层 |
-| **bind 源路径写错**（相对路径 / 拼错） | 空目录**遮盖**镜像里的配置 → 应用读到空配置 | `docker inspect -f '{{json .Mounts}}' 名`；`docker volume ls` 看是否多出一行 |
+| 配置从**环境变量**读取，重建时忘记带 `-e` / `--env-file` | 配置不在文件中而在容器环境里，重建即失 | `docker inspect -f '{{json .Config.Env}}' 名`，对比 `docker history` 的 `ENV` 层 |
+| **bind mount 源路径写错**（相对路径 / 拼写错误） | 空目录**遮盖**镜像中的配置 → 应用读到空配置 | `docker inspect -f '{{json .Mounts}}' 名`；`docker volume ls` 看是否多出一行 |
 
-> 题眼：题目字面是「**重启**」—— 若真是 `docker restart`，原因 ② 根本不是嫌疑人（可写层还在）。这正好和第 1 题串成一条因果链。
+> 关键点：题目字面是"**重启**"—— 若真是 `docker restart`，原因 ② 根本不是嫌疑人（可写层仍在）。这与 `restart` / `run` 的对象层区别是同一条因果链。
 
-### Linux 题 · Day 4 shell（分词）
+### 6.2 Linux 题：分词与 glob
 
-**我的答案（原答）：**
+**题目**：目录中有 `a b.txt`、`*star*`、`-dash`、`normal.log`。写一个 `for` 循环逐个安全打印：不漏文件、含空格的不会被拆开、`-dash` 不被当作选项。
+
+**我的原答**
 
 ```bash
 for f in *; do
@@ -246,133 +238,49 @@ for f in *; do
 done
 ```
 
-**批改：骨架对（glob + 引号两个主坑都避开），漏 3 个条件**
+**批改：骨架正确（glob 与引号两个主要问题都避开了），但漏 3 个条件**
 
 | 漏点 | 现象 | 机制 | 正解 |
 |---|---|---|---|
 | **不漏文件** | `*` **不匹配** `.` 开头的文件 | glob 默认不匹配隐藏文件；`$(ls)` 同样漏（`ls` 默认不显示隐藏文件） | `shopt -s dotglob` 或追加 `.[!.]*` |
-| **`-dash` 不被当选项** | 本题用 `echo` 侥幸没事 | bash 的 `echo` 只认 `-n/-e/-E`；换个文件名叫 `-n` 就没了；换成 `cp`/`rm`/`mv` **必然**踩 | `printf '%s\n' "$f"`（printf 不解析选项）；真实操作加 `--`：`cp -- "$f" /backup/` |
-| **空目录兜底** | 打印出一个字面量 `*` | glob 无匹配时，bash 默认把 `*` **原样**当文件名传下去 | `shopt -s nullglob` 或 `[ -e "$f" ] \|\| continue` |
+| **`-dash` 不被当选项** | 本题用 `echo` 未出错 | bash 的 `echo` 只识别 `-n/-e/-E`；换成 `cp`/`rm`/`mv` **必然**踩 | `printf '%s\n' "$f"`（printf 不解析选项）；真实操作加 `--`：`cp -- "$f" /backup/` |
+| **空目录兜底** | 打印出一个字面量 `*` | glob 无匹配时 bash 默认把 `*` **原样**作为文件名传递 | `shopt -s nullglob` 或 `[ -e "$f" ] \|\| continue` |
 
-**稳妥写法（两个版本）**：
+**稳妥写法（两个版本）**
 
 ```bash
-# A：靠 shopt 改行为
+# A：通过 shopt 改变默认行为
 shopt -s dotglob nullglob
 for f in *; do
     printf '%s\n' "$f"
 done
 
-# B：不改全局设置（脚本里更安全，不污染后续代码）
+# B：不改全局设置（脚本中更安全，不影响后续代码）
 for f in * .[!.]*; do
     [ -e "$f" ] || continue      # 兜底：无匹配时跳过字面量
     printf '%s\n' "$f"           # printf 不把 -dash 当选项
 done
 ```
 
-> 串起「Shell 展开顺序」（`docs/linux/Linux-故障索引.md` §2 机制 3）：别名 → 花括号 → 变量/命令替换 → **分词(IFS)** → 通配符 → 去引号。**分词在通配符之前** → glob 展开的结果**不再被拆**；而 `$(ls)` 的输出正好经过「分词」这一步，必然被拆。
+> 与「Shell 展开顺序」的关系（`docs/linux/Linux-故障索引.md` §2 机制 3）：别名 → 花括号 → 变量/命令替换 → **分词(IFS)** → 通配符 → 去引号。**分词在通配符之前**，因此 glob 展开的结果不会再被拆分；而 `$(ls)` 的输出正好经过"分词"这一步，必然被拆开。
 
 ---
 
-## 概念
+## 7. 遗留疑问
 
-> 学完填：可写层为什么丢数据、volume 与 bind mount 的本质区别、容器名解析是谁在干、`-p` 到底做了什么。
-
-| 要点 | 用自己的话写一遍 |
-|---|---|
-| 可写层为什么随容器删除而消失 | ⚠️ 别再答「因为没持久化」—— 那是循环论证。真相：**可写层是磁盘上的真实目录**，生命周期跟**容器对象**绑定（**不跟进程**）；`docker rm` 删容器对象 → dockerd 把该目录一起删。正确因果 = **可写层和容器同生共死**。<br>**在哪 / 怎么证明**：它**不是** bind mount，而是 overlay **联合挂载**的 `upperdir`（lowerdir=镜像只读层，upperdir=可写层，merged=容器看到的 rootfs）。不用 `GraphDriver` 字段也能看到：<br>`docker run --rm webapp:v2 sh -c 'grep -o "upperdir=[^,]*" /proc/mounts'` ← **容器自己就把可写层的真实路径报出来了**<br>**和卷的形式像不像**：**都是宿主/VM 文件系统上的普通目录**，区别只在「归谁」—— 可写层按**容器 ID** 索引、只属于这一个容器（是 rootfs 的一层）；卷按**卷名**索引、可被多个容器同时挂（本质是把一块宿主目录 bind mount 进容器） |
-| 命名卷的本质是什么（宿主上是什么） | 「宿主」= **跑 dockerd 的那台机器**上的一个目录（`/var/lib/docker/volumes/<名>/_data`），**不等于你的本地 shell**。本机是 Docker Desktop → 该目录在 **VM 内部**，宿主 `sudo ls` 报 `No such file or directory`。卷 = **Docker 管的独立对象**，只是「恰好」落在一个目录上；`Scope: local` = 只属于**单台 daemon**（这就是卷不能跨主机的原因） |
-| volume vs bind mount 的区别 | ① **谁建**：卷是 Docker 建（`docker volume create` / 自动建），bind 是你 `mkdir` 的普通目录。② **谁管**：卷是 Docker 对象（`docker volume rm`），bind 归操作系统（`rm -rf`）。③ **空目录行为**：空卷会**预填充**镜像内容（实测 8037381 字节 = Day 3 那个二进制）；bind **无条件遮盖**（空目录就是空）。④ **可移植性**：卷能 `docker volume ls` 看到、由 Docker 管理；bind 路径写错会静默新建空目录、或**静默变成卷名**。⑤ **适用**：卷=生产数据；bind=开发时挂代码/配置 |
-| `--rm` 对 volume / bind mount 分别有什么影响 | `--rm` 只删**容器**（以及它创建的**匿名卷**）。**命名卷**和 **bind 宿主目录**都不受影响，数据都还在 |
-| 默认 bridge 为什么不能按容器名解析 | `docker0` 上只有 IP、**没有名字服务**；容器 resolv.conf 抄的是宿主（Docker Desktop VM）的 `192.168.65.7`，注释写 `(legacy)` → `nslookup n1` 得 **NXDOMAIN**、`wget` 得 `bad address`。⚠️ 精确说法：**能按 IP 互访**，只是**不能按名字** |
-| 自定义网络的「内嵌 DNS」是谁在跑 | **dockerd**。它给容器写 `nameserver 127.0.0.11`（注释 `(internal resolver)`），并用 iptables 把该地址**劫持**到自己的解析器；非本网络的域名转发给 `ExtServers: [host(192.168.65.7)]`；`ndots:0` 也是它加的。所以名字与容器**实时同步** |
-| `-p 8081:8080` 背后发生了什么（DNAT） | **实测规则**（在 VM 的 netns 里查到）：`Chain DOCKER (2 references)` → `DNAT tcp dpt:8081 to:172.17.0.2:8080` —— 即「**目的=宿主:8081 的包，把目的地址改写成容器IP:8080**」。`(2 references)` 说明这条链被引用了 2 次（`PREROUTING` 管外部流量 + `OUTPUT` 管本机/localhost 流量）。另外 Dockerd 还会起 `docker-proxy` 在宿主端口上真的 listen，兜住 iptables 处理不好的路径 |
-| 容器间通信需要 `-p` 吗？`-p` 服务于谁 | **不需要**。同子网容器**二层直连**（`172.19.0.2` ↔ `172.19.0.3`），根本不经过宿主。**`-p` 只服务于「宿主/外部 → 容器」这一段** |
-| 为什么说「容器内 8080」和「宿主 8081」是两个世界 | 两个不同的 **net namespace**：容器里的 `8080` 是应用 listen 的端口（属于容器 netns）；宿主的 `8081` 是 DNAT 规则 + docker-proxy 的入口。**同一个服务，两个 namespace 里的两个端口** |
-
-### 附：四层生命周期对照（`stop` / `restart` / `rm` 的分水岭）
-
-> ⚠️ 关键区分：`docker run` = **新建一个容器**（新可写层）；`docker restart` = **重启同一个容器**（可写层原封不动）。把这两件事混成一件，就会得出「重启数据也没了」的错误结论。
-
-| 对象 | 生命周期跟谁走 | `stop` / `start` | `restart` | `rm` | 删镜像 |
-|---|---|---|---|---|---|
-| 镜像**只读层** | 镜像 | 在 | 在 | 在 | **没了** |
-| 容器**可写层** | **容器对象** | **在** | **在** | **没了** | 无关（容器已删） |
-| **命名卷** | **独立**（除非 `docker rm -v`） | 在 | 在 | **在** | 在 |
-| **bind mount** | **宿主目录**（跟谁都不绑） | 在 | 在 | **在** | 在 |
-| **tmpfs** | **容器本次启动**（内存） | **没了** | **没了**（重挂空 tmpfs） | 没了 | — |
-| 容器内**进程** | 进程 | 死 | 死 + 重启（新 PID 1） | 死 | — |
-
-**类比纠正**：可写层**不是内存**。`docker stop` 像「人离开桌子」，**草稿纸（可写层）还在桌上**；`docker rm` 才是「把桌子搬走扔掉」。真正随进程消失的是**内存** —— `--tmpfs` 才接近这个比喻。
-
-**`docker rm` vs `docker rm -f`**：容器在跑时 `docker rm` 会被 daemon 拒绝（`container is running: stop the container before removing or force remove`）；`-f` = 先对 PID 1 发 **SIGKILL**，再删容器对象。
-→ 步骤 1 的 Q2 答案：`rm -f` 删**两样** —— ① 进程（SIGKILL）② 容器对象及其可写层（含日志、netns）；**镜像不碰**。
-
-### 附：`--tmpfs` + 四种挂载的统一视角
-
-**统一视角**：`-v` / `--tmpfs` / 不挂载，本质都是「给容器某个路径挂上一个东西」，差别只有两问 —— **那是什么？谁管它？** 除了 `--tmpfs` 在**内存**，其余全在**磁盘**上（都是宿主/VM 文件系统里的普通目录）。
-
-**tmpfs 的两个坑 + 用途**
-
-- `mount` 里的 **`noexec` 是默认的** → 把脚本/二进制放 `/tmp` 再跑会 `Permission denied`（即使有 `+x`）；要能执行得写 `--tmpfs /tmp:rw,exec`
-- tmpfs 的写入**计入 cgroup 内存** → `docker run -m 512m --tmpfs /tmp` 写满会**触发 OOM Kill（137）**
-- 用途：① 密钥/证书（不落盘）② 临时缓存 / 上传中转（不污染可写层）③ Unix socket 目录
-- `Size 5.8G` = **可用内存的一半**（反推容器看到的内存 ≈ 11.6GB）
-
----
-
-## 命令
-
-| 场景 | 命令 | 说明 |
+| # | 问题 | 状态 |
 |---|---|---|
-| 建卷 / 看卷 | `docker volume create webvol`；`docker volume ls` | `create` 返回**卷名** |
-| 看卷落点 | `docker volume inspect -f '{{.Mountpoint}}' webvol` | 路径属于 **daemon 所在的机器**（Docker Desktop = VM 内，宿主看不到） |
-| 卷里有什么（绕开宿主路径） | `docker run --rm -v webvol:/data alpine:3.22 ls -l /data` | **通吃所有环境**，推荐 |
-| 往卷里写（避免 CMD 干扰实验） | `docker exec <容器> sh -c 'echo v1 > /data/x'` | 用 exec 写；CMD 只留 `sleep 600` |
-| 看悬空卷 | `docker volume ls -f dangling=true` | 没被任何容器（含已停止）引用的卷 |
-| 谁占着这个卷 | `docker ps -a --filter volume=<卷名或ID>` | 排查匿名卷归属 |
-| 清悬空卷 | `docker volume prune` | 默认**只删匿名卷**（命名卷要 `-a`） |
-| bind 双向验证 | `docker run --rm -v $PWD/hostdir:/data webapp:v2 cat /data/f.txt` | 宿主写 → 容器**立刻**可见 |
-| 对照：bind **不拷贝** | `docker run --rm -v $PWD/emptydir:/app webapp:v2 ls -l /app` → `total 0` | vs 空卷 `-v webvol2:/app` → 有 `webapp` |
-| 更安全的挂载写法 | `--mount type=bind,src=$PWD/hostdir,dst=/data` | 显式声明类型，无「被当卷名」歧义 |
-| 临时内存盘 | `docker run --tmpfs /tmp webapp:v2 sh -c 'df -h /tmp; mount \| grep /tmp'` | 容器停/重启即失；默认带 **`noexec`** |
-| 指定大小/权限 | `--tmpfs /tmp:rw,size=64m,mode=1777`（要能执行加 `exec`） | 默认 size = 内存一半 |
-| 发布端口 | `docker run -d -p 8081:8080 --name d4p webapp:v2` | **左=宿主，右=容器** |
-| 看映射表 | `docker port d4p` | `8080/tcp -> 0.0.0.0:8081`（左边容器、右边宿主） |
-| 宿主侧谁在听 | `sudo ss -ltnp \| grep 8081` | 本机（Docker Desktop）**连 sudo 也看不到属主**，只有 `LISTEN *:8081` |
-| 容器内谁在听 | `docker exec d4p netstat -tlnp` | `:::8080 LISTEN 1/webapp`（`:::` = IPv6 通配 + 双栈，也收 IPv4） |
-| 自定义网络里用名字访问 | `docker run --rm --network mynet alpine:3.22 wget -qO- http://w1:8080` | 不需要 `-p` |
-
-### 报错前缀 = 谁在说话
-
-→ 完整表见 `docs/docker/05-排障索引.md` §三「报错前缀」。**本日实测三个**：`OCI runtime exec failed`（runc —— `cat` 打成 `car`）· `Error response from daemon`（dockerd —— 删运行中容器被拒）· `template parsing error`（本地 CLI —— `GraphDriver` 字段不存在）。
+| 1 | `-v hostdir:/data` 为什么会**静默**变成命名卷？Docker 依据什么判断"这是路径还是卷名" | ⬜ 待查：`--mount` 是否也会静默 |
+| 2 | 默认 bridge 的容器"按 IP 互访"走的是二层直连还是经过网关 | ⬜ 待查 |
+| 3 | 网络基础薄弱是本次预判第 3、4 题首答失败的原因（当时不知道"网桥"是什么）→ 补课清单见下 | 🔶 已补基础模型，可重答 |
 
 ---
 
-## 易错点
+## 附：网络基础补课清单（按需补，不占主线时间）
 
-| 错法 | 现象 | 正确做法 |
-|---|---|---|
-| 以为 `docker restart` 也会丢数据 | 得出「可写层像内存，一停就没」的错误结论 | `restart` = **重启同一个容器**，可写层**原封不动**；`run` 才是**新建容器**。两者一混就得出错误因果 |
-| 用 `docker inspect -f '{{.GraphDriver.Data.UpperDir}}'` 找可写层 | `template parsing error: ... map has no entry for key "GraphDriver"` | 这是**字段在你这套后端里不存在**（本机 Docker v28+ 用 **containerd 镜像存储**），不是命令写错。替代：`docker diff <容器>` / `docker info -f '{{.Driver}}'` / `sudo find /var/lib/docker/containerd -name '<文件>'` |
-| 用 CMD 里带 `echo > /data.txt` 的容器测 restart | 看起来「数据还在」，其实是 PID 1 重启后**重新写了一遍**，实验无效 | 测持久化时，**文件要用 `docker exec` 从外面写**，CMD 只留 `sleep 600` |
-| 以为 `docker volume prune` 会清掉命名卷 | 实测 `Total reclaimed space: 0B`，已悬空的**命名**卷 `webvol2` 还在（`docker volume ls -f dangling=true` 里仍在） | 默认**只删匿名卷**；要连命名卷一起删用 `docker volume prune -a` |
-| 以为卷一定能宿主 `sudo ls /var/lib/docker/volumes/...` 看到 | `ls: cannot access ...: No such file or directory` | 本机 daemon 是 **Docker Desktop**（数据在 VM 里）；「宿主」= **跑 dockerd 的那台机器** |
-| 用**相对路径**写 `-v hostdir:/data` | **静默创建了一个叫 `hostdir` 的命名卷**（`docker volume ls` 多一行），容器里 `/data` 是空的（`total 0`）—— 数据既不在宿主目录、也不在预期位置 | `-v` 的源**必须写绝对路径**（`$PWD/hostdir`）；**不以 `/` 开头 = 卷名**。更稳：`--mount type=bind,src=$PWD/hostdir,dst=/data` |
-| 把要执行的脚本/二进制放进 `--tmpfs` 目录再运行 | `Permission denied`，即使文件有 `+x` | Docker 给 tmpfs 默认挂了 **`noexec`**（`mount` 输出里能看到）。要执行得显式覆盖：`--tmpfs /tmp:rw,exec` |
-| 说「默认 bridge 里容器**不能互访**」 | 用名字访问确实失败，就以为彻底不通 | 精确说法：**能按 IP 互访**（同在 `docker0` 子网），只是**没有名字服务**。`--link` 就是拿 `/etc/hosts` 补这个缺陷 |
-| 看到 DNS 失败就以为"网络不通" | 不看 DNS 到底回的什么 | `NXDOMAIN` = **解析器正常工作，只是它不认识这个名字**（属于"名字问题"）；若为超时 / `SERVFAIL` 才是"DNS 服务器本身有问题"。两种病因完全不同 |
-| 在宿主上 `sudo iptables -t nat -L DOCKER -n` 查 DNAT | `sudo: iptables: command not found` | 两个原因叠加：① 宿主系统**没装** `iptables`（新发行版多改用 nftables）② **更根本**：daemon 在 Docker Desktop 的 **VM** 里，规则本来就不在你的宿主上。真要查：`docker run --rm --privileged --net=host alpine:3.22 sh -c 'apk add -q iptables && iptables -t nat -L DOCKER -n'` |
-| 用 `ss -ltnp` 查宿主端口却看不到进程名 | Process 列**空白**，加 `sudo` 后**仍然空白**（本机 Docker Desktop） | 普通情况：`-p` 要 root 才显示属主。本机情况不同：`docker/desktop-*` 的**端口转发组件**在宿主上暴露监听，但 `ss` 拿不到属主信息（⚠️ 这是我的**推断**，未在书里/官方文档核对）。想继续挖：`sudo lsof -i :8081`、`sudo fuser -n tcp 8081`、`ps -ef \| grep -i docker` |
+**目标不是学完 TCP/IP，而是补到"能看懂 Docker / K8s 网络"的量。**
 
----
-
-## 网络补课清单（休息时看视频，不占主线时间）
-
-> **结论：网络必须单独补，这不是效率问题。** 存储你能秒懂，是因为操作系统你学过（inode / 进程 / 文件系统 / 挂载）；网络是**另一套模型**，没建过模型就永远是「一团乱」。
-> 目标**不是**学完 TCP/IP，而是**补够看懂 Docker / K8s 网络的量**。
-
-| 优先级 | 要补的概念 | 对应今天的哪个现象 |
+| 优先级 | 概念 | 对应本日的哪个现象 |
 |---|---|---|
 | 1 | 二层 vs 三层（MAC / IP） | veth、网桥、`docker0` |
 | 2 | IP + 子网掩码 + CIDR | `172.17.0.0/16`、`172.19.0.2` |
@@ -380,41 +288,16 @@ done
 | 4 | **NAT：SNAT / DNAT** | `-p 8081:8080`、`iptables -t nat` |
 | 5 | DNS 解析流程 | `resolv.conf`、`127.0.0.11`、`NXDOMAIN` |
 | 6 | 端口 / socket（含 `:::` 双栈） | `LISTEN *:8081`、`netstat -tlnp` |
-| 7 | 抓包 | 想亲眼看包怎么走时的终极手段 |
+| 7 | 抓包 | 需要亲眼确认包路径时的最终手段 |
 
-**只看这 4 个概念（合计 ~1.5 h，别再多了）**
+**只需先搞懂这 4 条（合计约 1.5 小时）**
 
-| 概念 | 只要搞懂这一句 | 时长 |
-|---|---|---|
-| 二层 vs 三层 | 网桥/交换机只认 **MAC**；路由只认 **IP** | 15 min |
-| IP + CIDR | `172.17.0.0/16` 怎么读（前 16 位是网络号） | 20 min |
-| **NAT** | **出去改源地址（SNAT）、进来改目的地址（DNAT）** | 20 min |
-| DNS | 「名字 → IP」这一跳是谁在查 | 15 min |
+| 概念 | 关键句子 |
+|---|---|
+| 二层 vs 三层 | 网桥/交换机只识别 **MAC**；路由只识别 **IP** |
+| IP + CIDR | `172.17.0.0/16` 的前 16 位是网络号 |
+| **NAT** | **出口改源地址（SNAT）、入口改目的地址（DNAT）** |
+| DNS | "名字 → IP"这一跳由谁完成 |
 
-**短效资源（15 分钟内一集/一篇）**
-
-| 资源 | 形式 | 时长 | 去哪找 |
-|---|---|---|---|
-| Cloudflare Learning（中文） | 图文 | 5~10 min/篇 | 搜 `cloudflare learning 中文 NAT / DNS` |
-| 小林coding 图解网络 | 图文 | 10~15 min/篇 | `xiaolincoding.com/network/` |
-| Practical Networking | 视频 | 5~15 min/集，极聚焦 | YouTube 搜 `Practical Networking subnetting` |
-| Crash Course 计算机科学（中文字幕） | 视频 | ~10 min/集 | B 站搜「Crash Course 计算机网络」 |
-| 湖科大教书匠 | 视频 | 长 | B 站**跳看**「交换机与网桥」「IP 与子网」「NAT」「DNS」四个专题，**别从头看** |
-
-**B 站搜索关键词**（挑播放量高、时长 < 20 min 的）：`10分钟 讲透 子网掩码` · `NAT 原理 通俗` · `交换机 路由器 区别` · `DNS 解析 动画`
-
-**命令不用看视频学** —— 用本笔记的「命令」表和 `docs/docker/03-命令词典.md` §四 现查即可。
-
-⚠️ **别中断主线**：Day 5~7 和 Week 2 的任务照常走，网络基础当「背景音乐」补即可 —— 但 Week 2 进 K8s 后会更需要它（CNI / Service / iptables）。
-
----
-
-## 我的疑问
-
-> 写这里：今天没想通的、想找书/找我问的。**空白也是记录** —— 明天带着问题进 Day 5。
-
-| # | 题目 | 考点 | 状态 |
-|---|---|---|---|
-| 1 | 「可写层跟容器对象走」和「可写层是磁盘上的目录」这两句是同一件事的两种说法吗？`rm` 到底删了哪几样东西？ | 可写层 = overlay 的 `upperdir`；容器对象 vs 磁盘目录 | ✅ 已在 day4 澄清（`rm -f` = SIGKILL 进程 + 删容器对象/可写层；镜像不碰） |
-| 2 | `-v hostdir:/data` 为什么会**静默**变成命名卷？Docker 到底靠什么判断「这是路径还是卷名」？ | `-v` 的源解析规则（**不以 `/` 开头 = 卷名**） | ⬜ 待查：`--mount` 是否也会静默？ |
-| 3 | 默认 bridge 的容器「按 IP 互访」，走的是**二层直连**还是**经过网关**？ | 网桥内的转发路径 | ⬜ 待查 |
+> 第 2 周进入 K8s 后会更依赖这部分（CNI / Service / iptables），建议在进入第 2 周前补完第 1~4 项。
+> 命令不需要看视频学 —— 用本文 §3 命令表与 `docs/docker/02-命令词典.md` §四 现查即可。
