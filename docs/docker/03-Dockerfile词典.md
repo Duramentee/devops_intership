@@ -1,11 +1,12 @@
 # Dockerfile 指令词典
 
 > 用法：写 Dockerfile 时逐条查语义；写完用「缓存与顺序」一节自查。
-> 铁律：**构建时的事用 `RUN`，运行时的事用 `CMD`/`ENTRYPOINT`。**
+> 规则：**构建时的事用 `RUN`，运行时的事用 `CMD`/`ENTRYPOINT`。**
+> 🧭 查具体知识点：`docs/00-知识点索引.md` §1-D（Dockerfile）· §1-E（权限/安全）
 
 ---
 
-## 一、构建流程（先懂这个再写）
+## 一、构建流程
 
 | 步 | 发生什么 |
 |---|---|
@@ -38,10 +39,7 @@
 | `VOLUME /data` | 声明匿名卷挂载点 | 运行 | 数据不入可写层 |
 | `LABEL k=v` | 镜像元数据 | 元数据 | 版本、维护者、OCI 标准注解 |
 | `HEALTHCHECK [选项] CMD 命令` | 健康检查 | 运行 | 退出码 0 健康、1 不健康 |
-| `SHELL ["/bin/bash","-c"]` | 改 shell form 用的解释器 | 构建 | 默认 Linux 是 `/bin/sh -c` |
-| `STOPSIGNAL SIGTERM` | `docker stop` 时发的信号 | 运行 | 默认已是 SIGTERM |
-| `ONBUILD 指令` | 留给"别人的下游镜像"执行 | 构建 | 少见，慎用 |
-| `.dockerignore`（文件） | 排除不进上下文的内容 | 构建 | 省时间、防泄密 |
+| `.dockerignore`（文件） | 排除不进上下文的内容 | 构建 | 省时间、防泄密（见 §五） |
 
 ---
 
@@ -74,7 +72,7 @@ CMD ["-g", "daemon off;"]
 
 ---
 
-## 四、缓存与顺序（今天/明天的主线）
+## 四、缓存与顺序
 
 | 规则 | 内容 |
 |---|---|
@@ -118,21 +116,26 @@ webapp      # 本地编译产物，不该进镜像
 
 ---
 
-## 六、多阶段构建（Day 3 预览）
+## 六、多阶段构建
 
 ```dockerfile
-# 阶段1：builder，只负责编译
-FROM golang:1.22-alpine AS builder
+# 阶段1：builder，只负责编译（版本与本周项目一致）
+FROM golang:1.25.1-alpine AS builder
 WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /out/app .
+COPY go.mod ./
+RUN go mod download          # ⚠️ 不能写 tidy：此刻源码还没进来
+COPY main.go ./
+RUN CGO_ENABLED=0 go build -ldflags "-s -w" -o /out/webapp ./main.go
 
-# 阶段2：runtime，只放产物
-FROM alpine:3.20
-COPY --from=builder /out/app /app
-CMD ["/app"]
+# 阶段2：runtime，只放产物（+ 非 root）
+FROM alpine:3.22
+RUN adduser -D -u 10001 app
+COPY --chown=10001:10001 --from=builder /out/webapp /app/webapp
+USER 10001:10001
+EXPOSE 8080
+HEALTHCHECK --interval=5s --timeout=2s --retries=2 \
+  CMD ["wget","-q","--spider","http://localhost:8080/"]
+CMD ["/app/webapp"]
 ```
 
 | 要点 | 说明 |
@@ -144,7 +147,7 @@ CMD ["/app"]
 
 ---
 
-## 七、反模式清单（写完全部自查一遍）
+## 七、反模式清单与自查
 
 | 反模式 | 问题 | 正确做法 |
 |---|---|---|
@@ -181,16 +184,6 @@ CMD ["/app"]
 | 适合写进 Dockerfile / CI | ✅ | ❌（会卡在提示符） | ✅（配 `-D`） |
 | 组参数语义 | `-g` 主组 / `-G` 附加组 | 同 shadow | ⚠️ **`-g` 是注释、`-G` 是组 —— 与 shadow 相反** |
 
-**用法**
-
-| 实现 | 场景 | 命令 |
-|---|---|---|
-| shadow `useradd` | 普通用户 + 家目录 | `useradd -m -u 10001 -s /bin/bash app` |
-| shadow `useradd` | 系统账号（无家目录、不可登录） | `useradd -r -s /sbin/nologin svc` |
-| Debian `adduser` | 人手交互建用户 | `adduser app` |
-| Debian `adduser` | **Dockerfile 里静默建** | `adduser --disabled-password --gecos "" --uid 10001 app` |
-| Alpine `adduser` | **Dockerfile 里静默建** | `adduser -D -u 10001 app` |
-
 **按底座选（Dockerfile 里到底写哪行）**
 
 | 底座 | 写什么 | 理由 |
@@ -215,15 +208,15 @@ CMD ["/app"]
 
 **(b) 1000 / 100 这些线是发行版约定，不是内核规则**（写在 `/etc/login.defs`）
 
-| 区间 | Debian/Ubuntu | RHEL 系 | 用途 |
-|---|---|---|---|
-| `0` | root | root | |
-| `100–999` | `SYS_UID_MIN..SYS_UID_MAX` | `201–999` | 系统服务账号（装包时自动分配） |
-| `1000–60000` | `UID_MIN..UID_MAX` | `1000–60000` | 普通用户（人手 `adduser` 的分段） |
+| 区间 | 含义 |
+|---|---|
+| `0` | root |
+| `100–999` | 系统服务账号（装包时自动分配；`SYS_UID_MIN..MAX`） |
+| `1000–60000` | 普通用户（`UID_MIN..UID_MAX`，人手 `adduser` 的分段） |
 
-**(c) 固定号随基础镜像变**：`33` 在 Debian 基础镜像里是 `www-data`，换个基础镜像可能是别的账号 → 用 `getent passwd 33` 查，**别背**。
+固定号会随基础镜像变（`33` 在 Debian 里是 `www-data`）→ 用 `getent passwd 33` 查，**别背**。
 
-**(d) `10001` 是社区惯例，没有内核含义**：≥1000（落在"普通用户"区间）· 远高于发行版预置号段（跨发行版安全）· 远离内核特殊值（0/65534）· 官方文档与 K8s `runAsUser: 10001` 示例高频出现。
+**(c) `10001` 是社区惯例，没有内核含义**：≥1000（落在"普通用户"区间）· 远高于发行版预置号段（跨发行版安全）· 远离内核特殊值（0/65534）· 官方文档与 K8s `runAsUser: 10001` 示例高频出现。
 
 **真正必须保证的 3 条约束**（比"选哪个数字"重要得多）
 
@@ -233,7 +226,7 @@ CMD ["/app"]
 | 2 | **UID 和 GID 要配对写** | 只写 `USER 10001` → 进程 **gid 仍是 0（root 组）**；加固版写 `USER 10001:10001`，build 后 `docker exec <cid> id` 实测确认 |
 | 3 | **bind mount 时 UID 要和宿主数据属主对齐** | 宿主目录属主 1000、容器跑 10001 → 写不进去（非 root 化最常见的翻车点）；临时办法 `-u $(id -u):$(id -g)` |
 
-**(e) 容器特有：容器 uid 0 是否等于宿主 uid 0 取决于映射**
+**(d) 容器特有：容器 uid 0 是否等于宿主 uid 0 取决于映射**
 
 | 查什么 | 命令 | 说明 |
 |---|---|---|
@@ -247,18 +240,7 @@ CMD ["/app"]
 | 以为 `USER` 会顺手设 `HOME` | `${HOME}` 仍指 `/root`（或为空） | `USER` 不设任何 env；需要就显式 `ENV HOME=/app` |
 | 以为 `COPY` 会尊重 `USER` | 文件属主仍是 root | 用 `COPY --chown=u:g` —— **COPY 的属主只由 `--chown` 决定** |
 
----
-
-## 九、自查清单（写完作业用）
-
-- [ ] 每条指令的时机（构建 / 运行）我给对了吗？
-- [ ] 改动最频繁的东西放最后了吗？
-- [ ] `COPY` 的源文件在**上下文**里真的存在吗？（构建上下文 ≠ 宿主绝对路径）
-- [ ] 启动命令是 exec form 吗？PID 1 是服务本身吗？
-- [ ] 有没有把密钥、`.git`、本地二进制带进镜像？
-- [ ] 基础镜像 tag 是固定的吗？
-- [ ] 目标底座里有 `USER` 写的那个用户吗？（`scratch` 只能写数字）
-- [ ] `--chown` 的 uid:gid 和 `USER` 的 uid:gid 对得上吗？
+> 写完再补三问（上面表里没覆盖的）：① 每条指令的**时机**（构建/运行）我给对了吗？② `COPY` 的源文件在**上下文**里真的存在吗（上下文 ≠ 宿主绝对路径）？③ 目标底座里有 `USER` 写的那个用户吗（`scratch` 只能写数字）？
 
 ## 自测
 

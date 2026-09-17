@@ -9,13 +9,15 @@
 | `assets/text/k8s-in-action.index.md` | 《Kubernetes in Action》中文版章节索引（页 → 标题） | 37KB | **先读这个**定位 |
 | `assets/text/k8s-in-action.txt` | 全书正文，839 页，带 `=== PAGE n ===` 分页标记 | 869KB | **只能 grep 后按行读片段，禁止整本读** |
 | `docs/k8s_in_action/00-学习路线图.md` | 学习总纲（7 周计划、每章速览、版本提醒） | — | 制定计划时读 |
+| `docs/00-知识点索引.md` | 🧭 **知识点级跳转索引**（一行一个知识点 → 直达讲义小节；现覆盖 Docker，Linux/K8s 待补） | — | 想不起来「那个点在哪」时查 |
 | `docs/k8s_in_action/01`~`08` | 8 个模块教程（概念/命令/易错/实践/自测） | — | 讲课时先读对应模块 |
 | `docs/linux/` | Linux 故障索引（现象→机制→命令）+ 21 天每日一题题库 | — | 抽背、出题时读 |
-| `docs/docker/` | Docker 词典 6 篇（总入口 / 架构 / 底层原理 / 命令 / Dockerfile / 排障索引） | — | 写 Dockerfile、跑容器、排障时先读对应篇 |
+| `docs/docker/` | Docker 词典 **4 篇**（01 架构与原理 / 02 命令 / 03 Dockerfile / 04 排障索引） | — | 写 Dockerfile、跑容器、排障时先读对应篇 |
 | `docs/github_actions_in_action/` | Actions 实战薄书（14 Session + Lab 1-8） | — | 第 5 周读 |
 | `plan/求职学习计划.md` | 六周总计划 + 进度勾选表 | — | 定进度时读 |
 | `plan/weekN/任务明细.md` | 每周逐日明细（目标/机制/任务/每日一题/自检） | — | 当天任务从这里取 |
 | `notes/weekN/dayN.md` | 我的学习笔记（按天记录） | — | 讲完就写这里 |
+| `notes/错题本.md` | ✍️ **错题本**（跳周累积；按错因分类 A~E + 复查记录） | — | 答错/答不全 → 立即追加一行 |
 | `code/weekN/dayN/` | **我的代码目录**（每天一个，放源码/Dockerfile/YAML/脚本） | — | 当天所有可执行产物写这里 |
 | `labs/` | 老师实训作业（`实践任务.md` + `shell/` 脚本） | — | 按任务号定位 |
 | `assets/pdf/` | 原始 PDF（K8s 书、Git 速查表、Actions 书） | — | **别读 PDF**；新书用 `.tools/pdf2text.mjs` 转 |
