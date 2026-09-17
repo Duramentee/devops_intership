@@ -10,9 +10,9 @@
 
 | # | 结论 |
 |---|---|
-| 1 | |
-| 2 | |
-| 3 | |
+| 1 | 本周产出可交付：`webapp:v4` **25.3MB / 非 root（uid 10001）/ (healthy)**；发布包在 `code/week1/day7/go-webapp/`（Dockerfile + .dockerignore + README），README 里的命令已实测可复现 |
+| 2 | 10 题自测 **64/100**：机制基本没问题，失分在"说不全"与"命令语义记错" → **B 类错因升为复习优先级第一** |
+| 3 | 知识资产成形：`docs/docker/` **4 篇词典** + `docs/00-知识点索引.md`（100 锚点全通）+ `notes/错题本.md`（45 条）|
 
 ---
 
@@ -20,14 +20,14 @@
 
 | # | 任务 | 完成 |
 |---|---|---|
-| 1 | 推之前自查 3 条命令 | ⬜ |
-| 2 | 自己写发布版 `Dockerfile` / `.dockerignore` / `README.md` | ⬜ |
-| 3 | 验收三件套（大小 / curl / 身份） | ⬜ |
-| 4 | 推到 GitHub（第 7 次 commit） | ⬜ |
-| 5 | Linux 每日一题（Day 7 综合找 bug） | ⬜ |
-| 6 | 10 题混合自测 | ⬜ |
-| 7 | 更新 `plan/求职学习计划.md` 勾选表 | ⬜ |
-| 8 | 四段收尾 | ⬜ |
+| 1 | 推之前自查 3 条命令 | ✅ 提交数 19（>7）；⚠️ 发现 5 个 PDF 被跟踪 → 已处理（`git rm --cached` + `.gitignore`） |
+| 2 | 发布版 `Dockerfile` / `.dockerignore` / `README.md` | ✅ 在 `code/week1/day7/go-webapp/`（无教学注释的干净版） |
+| 3 | 验收三件套（大小 / curl / 身份） | ✅ v4 25.3MB / `<h1>Hello DevOps</h1>` / `User=10001:10001` / `(healthy)` |
+| 4 | 推到 GitHub | ✅ 今日 4 个提交（docs / notes / chore / feat）已推；`main` 与 `origin/main` 同步 |
+| 5 | Linux 每日一题（Day 7 综合找 bug） | ⬜ **唯一剩项**（在 `docs/linux/Linux-每日一题.md`，三处 bug） |
+| 6 | 10 题混合自测 | ✅ 64/100，逐题批改见第五节 |
+| 7 | 更新 `plan/求职学习计划.md` 勾选表 | ✅ 第 1 周 → ✅ 完成；§0 现状表同步 |
+| 8 | 四段收尾 | 🔶 §一~§四 已由 AI 起稿，**需用自己的话过一遍** |
 
 ---
 
@@ -37,13 +37,13 @@
 
 | 主题 | 一句话机制（我自己的话） |
 |---|---|
-| 容器是什么 | |
-| 镜像分层与缓存 | |
-| 多阶段构建 | |
-| 数据持久化 | |
-| 容器网络 | |
-| 排障顺序 | |
-| 权限与加固 | |
+| 容器是什么 | namespace（限制能看到什么）+ cgroup（限制能用多少）的普通进程，与宿主**共用内核**；PID 1 退出即容器退出 |
+| 镜像分层与缓存 | 镜像 = 一组只读层；每条指令一层；缓存按 **cache key 链**（父层 key + 指令字符串 + 输入内容哈希）逐层比对，失效层之后全部重建 |
+| 多阶段构建 | 多个 `FROM`，阶段之间只能 `COPY --from` 单向取文件；**只有最后一个阶段成为最终镜像** → 编译期内容隔离在外 |
+| 数据持久化 | 可写层跟随**容器对象**；命名卷是独立对象；bind 就是宿主目录；tmpfs 在内存（`restart` 也丢） |
+| 容器网络 | veth → 网桥 → IP/路由 → SNAT（出去改源）+ DNAT（进来改目的，即 `-p`）→ DNS；**容器之间同子网直连，不需要 `-p`** |
+| 排障顺序 | 在不在 → 怎么退出（退出码/`State.Error`）→ 日志 → 环境 → 资源；再加一步**“谁杀的”用 `docker events`** |
+| 权限与加固 | 权限 = uid + capability 位图；非 root 时 `Prm`/`Eff` = 0，`--cap-add` 只进 `Bnd`；加固四件套 = 非 root + 无工具链/源码 + 最小能力 + 只读根 |
 
 ---
 
@@ -53,13 +53,26 @@
 
 | 场景 | 命令 | 说明 |
 |---|---|---|
-| | | |
+| 看每层多大 / 找体积大户 | `docker history webapp:v1` | 每条指令一行；`<missing>` 不是错误 |
+| 看退因（排障主力） | `docker inspect 名 -f '{{.State.ExitCode}} oom={{.State.OOMKilled}} {{.State.StartedAt}} → {{.State.FinishedAt}}'` | 一次拿齐四个字段 |
+| 查"谁杀的" | `docker events --since <Start> --until <现在>` | ⚠️ `--until` **不能用** `FinishedAt` |
+| 查已退出的容器 | `docker run --rm -it --entrypoint sh 镜像:tag`；`docker cp 名:/路径 /tmp/` | 已退出时 `exec`/`top` 不可用，`stats` 返回 `0B/0B` 假数据 |
+| 实时资源 | `docker stats --no-stream` | 读 cgroup 统计；只对运行中容器有效 |
+| 看能力位图 | `docker run --rm --entrypoint grep 镜像 ^Cap /proc/self/status` | `Eff` = 当前生效，`Bnd` = 能力上限 |
+| 加固运行 | `docker run -d --cap-drop=ALL --read-only --tmpfs /tmp -p 8080:8080 webapp:v4` | 最小能力 + 只读根 |
+| 查镜像内有无源码/密钥 | `docker run --rm --entrypoint find 镜像 / -name '*.go'`；`docker inspect -f '{{json .Config.Env}}' 镜像` | 不依赖容器运行状态与镜像内工具 |
+| 端口三视角 | `docker port 名`；`docker exec 名 netstat -tlnp`；`sudo ss -ltnp \| grep <端口>` | `docker port` 是**左容器 / 右宿主**，与 `-p` 顺序相反 |
+| 清理 | `docker container prune` + `docker image prune`（或 `docker system prune`） | `prune` **不涉及卷**；被容器引用的镜像不会删 |
 
 ### 易错点 Top 5（这一周踩过的）
 
 | # | 坑 | 现象 | 正确做法 |
 |---|---|---|---|
-| 1 | | | |
+| 1 | 把"构建期 / 运行期"混为一谈 | 用 overlay2 解释缓存失效；在 `RUN` 里建运行期文件 | 缓存 = cache key 链（构建期）；overlay2 = 层挂载（运行期）。**先问一句：这是哪个阶段的事** |
+| 2 | 命令语义记错（本轮最多） | `docker top` 当容器内 PID；`--until` 用 `FinishedAt`；以为 `prune` 会删卷/删在用镜像 | 命令表逐条核对；破坏性命令先 `docker system df` 预检 |
+| 3 | 把"不装 handler 的信号被忽略"当通用规律 | 推出"没 handler 就该 143" | 该保护**只对 PID 1 成立**：非 PID 1 → 143；Go 做 PID 1 → 2；`sh`/`sleep` 做 PID 1 → 超时 137 |
+| 4 | 用默认值做实验 | 绑 80 四组全成功，结论无效；默认容器里 443 也能绑 | 实验前后读 sysctl 基线值（`ip_unprivileged_port_start`、`ping_group_range`） |
+| 5 | 只答一层机制 | "容器 root 风险低"只答 capability；`scratch` 代价只答"没 shell" | 三层限制（namespace / capability / seccomp）；四项代价（shell / CA / tzdata / passwd） |
 | 2 | | | |
 | 3 | | | |
 | 4 | | | |
@@ -150,9 +163,21 @@
 
 | 段 | 内容 | 我的草稿 |
 |---|---|---|
-| 起点 | 一个能跑的 Go 服务 + 单阶段 Dockerfile 449MB | |
-| 问题 1 | 交付太慢 / 体积太大 → 分层顺序 + 多阶段 + scratch | |
-| 问题 2 | 排障没套路 → 退出码 + 5 步定位法 | |
-| 问题 3 | 安全扫描会挂 → 非 root + 无工具链 + 最小能力 + 只读根 | |
-| 结果 | 25.3MB / 非 root / `(healthy)` / README 可复现 | |
-| 证据 | GitHub commit 历史 + `docker history` 截图 | |
+| 起点 | 一个能跑的 Go 服务 + 单阶段 Dockerfile 449MB | 起点是一个能跑的 Go HTTP 服务，单阶段镜像 449MB —— Go 工具链和构建缓存都留在了层里 |
+| 问题 1 | 交付太慢 / 体积太大 → 分层顺序 + 多阶段 + scratch | 先调指令顺序把依赖层拆出来，再用多阶段构建把编译与运行分开（25.3MB）；又试了 `scratch`（12.6MB），但它没有 shell 和 CA 证书，排障与 HTTPS 出站不可用，最终选 alpine 折中 |
+| 问题 2 | 排障没套路 → 退出码 + 5 步定位法 | 做了 11 组退出码实验，发现 `docker stop` 的结局由「PID 1 是谁 + 装没装 handler」决定 —— 143 反而最少见，不装 handler 是 137，Go 还会回退成 2；于是 `CMD` 改 exec form 并在代码里注册信号处理 |
+| 问题 3 | 安全扫描会挂 → 非 root + 无工具链 + 最小能力 + 只读根 | 改成非 root（uid 10001）、`--cap-drop=ALL`、`--read-only --tmpfs`，并做了镜像内容检查（无源码、无 setuid）；**加固不增加体积** —— 元数据指令不产生层 |
+| 结果 | 25.3MB / 非 root / `(healthy)` / README 可复现 | 最终镜像 25.3MB、非 root、`(healthy)`；发布包的 README 里的构建/运行/验证命令均已实测可复现 |
+| 证据 | GitHub commit 历史 + `docker history` 截图 | GitHub 提交历史 + `docker history` + `docker images` 的四个版本体积对照 |
+
+### 90 秒完整话术（练三遍再看表）
+
+> 第一周的目标是把一个 Go 服务容器化并交付。起点是一个能跑的服务和一份单阶段 Dockerfile —— 镜像 449MB，因为 Go 工具链和构建缓存都留在了层里。
+>
+> 我先调指令顺序，把依赖列表单独一层；再用多阶段构建把编译和运行分开，降到 25.3MB。又试了 `scratch` 底座，能到 12.6MB，但它没有 shell 和 CA 证书，排障和 HTTPS 出站都不可用，所以最终选了 alpine。
+>
+> 第二块是排障。我做了 11 组退出码实验，发现 `docker stop` 的结局由「PID 1 是谁 + 装没装 handler」决定：143 反而最少见，不装 handler 是 137，Go 程序做 PID 1 还会回退成 2。据此把 `CMD` 改成 exec form，并在应用里注册了信号处理。
+>
+> 第三块是加固：非 root（uid 10001）、`--cap-drop=ALL`、只读根文件系统，并验证了镜像里没有源码、工具链和 setuid 文件。加固后体积没变 —— 因为 `USER`、`EXPOSE` 这些是元数据指令，不产生层。
+>
+> 所有证据都在 GitHub 的提交历史和 `docker history` 里，README 可以直接复现构建与验证步骤。
