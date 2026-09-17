@@ -1,7 +1,7 @@
 # Day 3 · 多阶段构建：把镜像压小
 
 > 目标：把 Day 2 那个 ≈360MB 的镜像压到 **10MB 量级**，并说清「builder 阶段为什么不会进最终镜像」。
-> 配套：`plan/week1/任务明细.md` 的 Day 3 节 · `docs/docker/04-Dockerfile词典.md` §六（多阶段构建）
+> 配套：`plan/week1/任务明细.md` 的 Day 3 节 · `docs/docker/03-Dockerfile词典.md` §六（多阶段构建）
 > 笔记落点：`notes/week1/day3.md`
 > **基线**：Day 2 的 `webapp:v1` = 17 层 / ≈360MB（其中 254MB 是 Go 工具链、91.8MB 是构建缓存）
 
@@ -66,7 +66,7 @@
 
 **两个方向的提示（不给答案）：**
 - 问题 1 的答案藏在 Day 2 的 `docker history` 里 —— 那 254MB 的 `COPY /target/` 是谁带进来的？它**运行时**真的需要吗？
-- 问题 3 的关键词是 `--from`，去 `docs/docker/04-Dockerfile词典.md` §二 查 `COPY` 那一行。
+- 问题 3 的关键词是 `--from`，去 `docs/docker/03-Dockerfile词典.md` §二 查 `COPY` 那一行。
 
 ### 步骤 3 · 构建与对比
 
@@ -91,7 +91,7 @@
 ⚠️ **三个预警**（不告诉你解法，自己踩）：
 1. 换 `scratch` 后容器可能直接起不来 —— 先看 `docker logs`，再想"二进制的运行依赖"。
 2. 就算起来了，如果程序要发 HTTPS 请求，可能报证书错误 —— 想想 `scratch` 里缺什么。
-3. `docker exec -it web2 sh` 会报 `no such file or directory` —— 这不是命令写错了，是镜像里**真没有 shell**。那怎么排障？先自己想，再看 `docs/docker/05-排障索引.md` §五。
+3. `docker exec -it web2 sh` 会报 `no such file or directory` —— 这不是命令写错了，是镜像里**真没有 shell**。那怎么排障？先自己想，再看 `docs/docker/04-排障索引.md` §五。
 
 ### 步骤 5 · 验收（全部打勾才算完成）
 
@@ -122,5 +122,5 @@
 | 完全没思路 | 说「给我一个提示」，只要**方向**不要答案 |
 | 有思路但不确定 | 先写下来发批改，按「哪里对 / 哪里错 / 为什么」改 |
 | 机制没懂 | 说「讲一下 XX 的机制」，按「现象 → 机制 → 命令 → 失败模式」讲 |
-| build 失败 | 先读 build 输出**最后 3 行**；scratch 相关问题先查 `docs/docker/05-排障索引.md` |
+| build 失败 | 先读 build 输出**最后 3 行**；scratch 相关问题先查 `docs/docker/04-排障索引.md` |
 | 镜像压不下去 | 先 `docker history` 找体积大户，再想"这层运行时需要吗" |

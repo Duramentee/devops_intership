@@ -1,7 +1,7 @@
 # Day 5 · 排障工具链 + 故意制造故障
 
 > 主题：容器出问题先看什么（分层定位 + 退出码）
-> 笔记：`notes/week1/day5.md`｜排障总索引：`docs/docker/05-排障索引.md`（§二「按退出码排障」）
+> 笔记：`notes/week1/day5.md`｜排障总索引：`docs/docker/04-排障索引.md`（§二「退出码速查」）
 > 环境：Docker Desktop 4.90.0 · Engine 29.7.2 · containerd 2.3.3 · runc 1.4.3
 
 ## 目录里有什么

@@ -23,4 +23,4 @@
 | Day 4 | `code/week1/day4/` | 数据与网络 |
 | Day 5 | `code/week1/day5/` | 排障工具链 |
 | Day 6 | `code/week1/day6/` | 容器安全 |
-| Day 7 | `code/week1/day7/` | 复盘 + 上仓库 |
+| Day 7 | `code/week1/day7/` | 复盘 + 上仓库；发布包在 `code/week1/day7/go-webapp/`（Dockerfile + .dockerignore + README，可直接 clone 后 build） |

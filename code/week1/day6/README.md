@@ -1,7 +1,7 @@
 # Day 6 · 容器安全 + Dockerfile 收尾
 
 > 目标：把 Day 3 那个「能跑、够小」的镜像，升级成**能拿去面试**的版本（非 root / 最小能力 / 只读根 / 无密钥）。
-> 配套：`docs/docker/04-Dockerfile词典.md` §二（`USER`/`HEALTHCHECK`）、§五（`.dockerignore`）、§七（反模式清单）· `plan/week1/任务明细.md` Day 6 节
+> 配套：`docs/docker/03-Dockerfile词典.md` §二（`USER`/`HEALTHCHECK`）、§五（`.dockerignore`）、§七（反模式清单）· `plan/week1/任务明细.md` Day 6 节
 > 笔记落点：`notes/week1/day6.md`
 > **基线**：`webapp:v2` = 25.3MB / 8.3MB / 6 层（alpine 多阶段）· `webapp:v3` = 12.6MB / 4.51MB / 4 层（scratch）
 
@@ -78,7 +78,7 @@
 | B | `ping: permission denied (are you root?)` | 1 |
 | C | 正常回包 `64 bytes from 8.8.8.8` | 0 |
 
-→ 结论：`--cap-drop=ALL` 下 ping 走的是 **datagram 路**（排除法：raw 不可能）；**"Docker 默认值" ≠ "最小权限"**。详见 `docs/docker/02-底层原理.md` §6.5。
+→ 结论：`--cap-drop=ALL` 下 ping 走的是 **datagram 路**（排除法：raw 不可能）；**"Docker 默认值" ≠ "最小权限"**。详见 `docs/docker/01-架构与原理.md` §10.5。
 
 **观察组 2 的坑（已踩）：绑 80 实验被默认值短路**
 
@@ -102,7 +102,7 @@
 | `CapEff` | **`0`** | **`0`** |
 | `CapBnd` | `a80425fb` | **`0x400`**（位 10 = `NET_BIND_SERVICE`） |
 
-→ **非 root 时 P/E 被清空，`--cap-add` 只进 `CapBnd`（天花板）→ 不生效**。详见 `docs/docker/02-底层原理.md` §6.6。
+→ **非 root 时 P/E 被清空，`--cap-add` 只进 `CapBnd`（能力上限）→ 不生效**。详见 `docs/docker/01-架构与原理.md` §10.6。
 
 **`Cap*` 五字段速查（今天的新知识点）**
 

@@ -1,0 +1,15 @@
+# 版本控制（体积 + 历史泄露）
+.git
+.gitignore
+
+# 本地编译产物：会覆盖镜像内编译结果（Day 2 踩过的坑）
+webapp
+
+# 日志与密钥
+*.log
+.env
+/secure
+
+# 文档与 Dockerfile 自身（构建上下文不需要）
+README.md
+Dockerfile*
