@@ -12,7 +12,8 @@
 |---|---|
 | 1 | 本周产出可交付：`webapp:v4` **25.3MB / 非 root（uid 10001）/ (healthy)**；发布包在 `code/week1/day7/go-webapp/`（Dockerfile + .dockerignore + README），README 里的命令已实测可复现 |
 | 2 | 10 题自测 **64/100**：机制基本没问题，失分在"说不全"与"命令语义记错" → **B 类错因升为复习优先级第一** |
-| 3 | 知识资产成形：`docs/docker/` **4 篇词典** + `docs/00-知识点索引.md`（100 锚点全通）+ `notes/错题本.md`（45 条）|
+| 3 | 知识资产成形：`docs/docker/` **4 篇词典** + `docs/00-知识点索引.md`（100 锚点全通）+ `notes/错题本.md`（48 条）|
+| 4 | 第 1 周 **8/8 任务闭环**：最后一题（Linux 综合找 bug）**5/10**，三处 bug 只找到 2 处 —— 漏的是「**结果对但写法错**」那一类（UUOC），这类错自查时最难发现 |
 
 ---
 
@@ -24,7 +25,7 @@
 | 2 | 发布版 `Dockerfile` / `.dockerignore` / `README.md` | ✅ 在 `code/week1/day7/go-webapp/`（无教学注释的干净版） |
 | 3 | 验收三件套（大小 / curl / 身份） | ✅ v4 25.3MB / `<h1>Hello DevOps</h1>` / `User=10001:10001` / `(healthy)` |
 | 4 | 推到 GitHub | ✅ 今日 4 个提交（docs / notes / chore / feat）已推；`main` 与 `origin/main` 同步 |
-| 5 | Linux 每日一题（Day 7 综合找 bug） | ⬜ **唯一剩项**（在 `docs/linux/Linux-每日一题.md`，三处 bug） |
+| 5 | Linux 每日一题（Day 7 综合找 bug） | ✅ **5/10**（3 处 bug 找到 2 处，漏「无用 `cat`」）→ 第 1 周 **8/8 任务闭环** |
 | 6 | 10 题混合自测 | ✅ 64/100，逐题批改见第五节 |
 | 7 | 更新 `plan/求职学习计划.md` 勾选表 | ✅ 第 1 周 → ✅ 完成；§0 现状表同步 |
 | 8 | 四段收尾 | 🔶 §一~§四 已由 AI 起稿，**需用自己的话过一遍** |
@@ -145,6 +146,50 @@
 
 > **失分结构**：机制类只有 Q1（现象答反）与 Q5（现象解释）；其余全部是"说不全"与"命令记错"。→ 理解到位，缺的是**输出精度**。
 > 错答已全部追加进 `notes/错题本.md`：**D32~D39**（并将 B 类提到复习优先级第一）。
+
+### Linux 每日一题 · Day 7 综合找 bug（**5 / 10**）
+
+**原题**
+
+```bash
+for f in $(ls /data); do cp $f /backup/; done
+cat /var/log/nginx/access.log | awk '{print $1}' | uniq -c | sort -rn | head
+```
+
+| 项 | 满分 | 得分 | 说明 |
+|---|---|---|---|
+| ① 定位分词 bug | 3 | 2 | 位置对（`$(ls)`），但把原因归给"文件名里有空格"这个**事实**，而不是"shell 在切分"这个**动作** |
+| ① 机制说清 | 2 | 0.5 | 没答：谁切（shell）、按什么切（`IFS`）、"`$f` 未加引号"是**第二处**独立切分点 |
+| ② 效率 bug（`cat \| awk`） | 2 | 0 | **完全没发现**，改完的命令里还留着 `cat` |
+| ③ 缺 `sort` | 2 | 2 | 定位 + 改法都对 |
+| ③ 机制说清（只比相邻行） | 1 | 0.5 | 只说了"必须 sort"，没说 `uniq` 的限定条件 |
+| **合计** | 10 | **5** | 三处 bug 找到 2 处 |
+
+**标准答案**
+
+| 原文 | bug | 改法 |
+|---|---|---|
+| `for f in $(ls /data)` | 命令替换结果被 **`IFS` 分词**；`ls` 还**漏掉 `.` 开头的隐藏文件** | `for f in /data/*`（glob 展开发生在分词**之后**，结果不再被切） |
+| `cp $f /backup/` | ① `$f` 未加引号 → **第二次**分词 ② `$f` 是**相对名**，隐含要求 cwd 恰为 `/data` ③ 名字以 `-` 开头会被 `cp` 当成选项 | `cp -- "$f" /backup/`；改成 glob 后 `$f` 已是 `/data/xxx` **全路径**，②③ 一并解决 |
+| （缺守卫） | 无匹配时 glob 保留字面量 `/data/*`，会对不存在的文件执行 `cp` | `[ -e "$f" ] \|\| continue` |
+| `cat 文件 \| awk ...` | 冗余 `cat`（**UUOC**） | `awk '{print $1}' /var/log/nginx/access.log \| ...` |
+| `... \| uniq -c \| sort -rn` | `uniq` **只合并相邻行** → 同一个 IP 出现多行 | `... \| sort \| uniq -c \| sort -rn \| head`，或 `awk '{c[$1]++} END{for(i in c) print c[i], i}'`（只排一次） |
+
+**健壮版（加分题 B）**：不依赖 glob、能处理上万文件、`-` 开头也对
+
+```bash
+find /data -mindepth 1 -maxdepth 1 -print0 |
+  while IFS= read -r -d '' f; do cp -- "$f" /backup/; done
+```
+
+| 参数 | 作用 |
+|---|---|
+| `-mindepth 1 -maxdepth 1` | 只要 `/data` 的**直接子项**，不递归（对应 `ls /data`；但 `find` **包含**隐藏文件） |
+| `-print0` | 用 **NUL** 分隔输出 —— NUL 是唯一不能出现在文件名里的字符 → 从根上消灭分词 |
+| `read -r -d ''` | `-d ''` = 以 NUL 为分隔；`-r` = 不把 `\` 当转义 |
+| `IFS=`（前缀） | `read` 默认会裁掉首尾空白，置空 `IFS` 才能原样读入 |
+
+> **一句话记法**：`ls` 的输出是**给人眼看的文本**，不是**给程序用的列表**。要文件名列表 → glob 或 `find -print0`。
 
 ---
 
