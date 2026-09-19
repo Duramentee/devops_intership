@@ -1,0 +1,71 @@
+                                                    !!! kc get pod -o wide !!! 
+NAME     READY   STATUS    RESTARTS   AGE     IP           NODE                 NOMINATED NODE   READINESS GATES
+webapp   1/1     Running   0          2m55s   10.244.0.6   kind-control-plane   <none>           <none>
+
+
+
+                                                    !!! kc describe pod webapp !!! 
+Name:             webapp
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             kind-control-plane/172.18.0.2
+Start Time:       Fri, 18 Sep 2026 14:20:41 +0800
+Labels:           app=webapp
+                  env=dev
+Annotations:      <none>
+Status:           Running
+IP:               10.244.0.6
+IPs:
+  IP:  10.244.0.6
+Containers:
+  webapp:
+    Container ID:   containerd://966803c0cd426fef3e119e040bc4e49175b034ce75a83c1851fc4e83abd22f85
+    Image:          webapp:v4
+    Image ID:       docker.io/library/import-2026-09-18@sha256:4bf2cfd4f0dfa4c6ee9aa517f012c05c50ec19286e68dd1f28f3422db0dbcb6b
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Fri, 18 Sep 2026 14:20:42 +0800
+    Ready:          True
+    Restart Count:  0
+    Environment:    <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-frk5p (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-frk5p:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason     Age    From               Message
+  ----    ------     ----   ----               -------
+  Normal  Scheduled  3m35s  default-scheduler  Successfully assigned default/webapp to kind-control-plane
+  Normal  Pulled     3m35s  kubelet            spec.containers{webapp}: Container image "webapp:v4" already present on machine and can be accessed by the pod
+  Normal  Created    3m35s  kubelet            spec.containers{webapp}: Container created
+  Normal  Started    3m35s  kubelet            spec.containers{webapp}: Container started
+
+所在ip地址: 
+    IP:               10.244.0.6
+    IPs:
+    IP:  10.244.0.6
+
+Events: 调度到 kind-control-plane -> 拉容器 webapp:v4 -> 创建容器 -> 启动容器
+
+
+
+                                                    !!! kubectl logs webapp
+2026/09/18 06:20:42 An simple http service running on :8080

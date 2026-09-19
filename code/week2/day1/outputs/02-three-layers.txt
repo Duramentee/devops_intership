@@ -1,0 +1,37 @@
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/webapp   3/3     3            3           57s
+
+NAME                                DESIRED   CURRENT   READY   AGE
+replicaset.apps/webapp-7dbcc8ff4b   3         3         3       57s
+
+NAME                          READY   STATUS    RESTARTS   AGE
+pod/webapp-7dbcc8ff4b-cz4vc   1/1     Running   0          56s
+pod/webapp-7dbcc8ff4b-pvr9k   1/1     Running   0          56s
+pod/webapp-7dbcc8ff4b-r8jvf   1/1     Running   0          56s
+
+# replicaset 名称为: webapp-7dbcc8ff4b
+# 三个pod共同的名称前缀为: 7dbcc8ff4b
+# 能观测到这两者是一致的, 也就是pod的名称前缀是它对应replicaset的名称
+
+# 执行 kc delete pod webapp-7dbcc8ff4b-cz4vc 之后得到了新的pod, 证明 controller 在工作:
+❯ kubectl get po -w
+NAME                      READY   STATUS    RESTARTS   AGE
+webapp-7dbcc8ff4b-pvr9k   1/1     Running   0          3m33s
+webapp-7dbcc8ff4b-qpndp   1/1     Running   0          8s
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   0          3m33s
+
+# 执行 kc scale deploy webapp --replicas=4 输出 deployment.apps/webapp scaled
+# 新建了一个pod webapp-7dbcc8ff4b-4glhh
+❯ kc get pod -o wide
+NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-7dbcc8ff4b-4glhh   1/1     Running   0          6s      10.244.0.11   kind-control-plane   <none>           <none>
+webapp-7dbcc8ff4b-pvr9k   1/1     Running   0          5m18s   10.244.0.9    kind-control-plane   <none>           <none>
+webapp-7dbcc8ff4b-qpndp   1/1     Running   0          113s    10.244.0.10   kind-control-plane   <none>           <none>
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   0          5m18s   10.244.0.7    kind-control-plane   <none>           <none>
+
+# 执行 kc scale deploy webapp --replicas=2 输出 deployment.apps/webapp scaled
+# 删除了两个pod: webapp-7dbcc8ff4b-4glhh 和 webapp-7dbcc8ff4b-qpndp
+❯ kc get pod -o wide
+NAME                      READY   STATUS    RESTARTS   AGE     IP           NODE                 NOMINATED NODE   READINESS GATES
+webapp-7dbcc8ff4b-pvr9k   1/1     Running   0          6m58s   10.244.0.9   kind-control-plane   <none>           <none>
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   0          6m58s   10.244.0.7   kind-control-plane   <none>           <none>

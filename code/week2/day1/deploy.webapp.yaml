@@ -4,20 +4,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: <>            # Deployment 的名称
+  name: webapp            # Deployment 的名称
 spec:
-  replicas: <>        # 期望的副本数量
+  replicas: 3        # 期望的副本数量
   selector:
     matchLabels:
-      app: <>         # 选择器的标签，必须与下面模板中的同名标签完全一致
+      app: webapp         # 选择器的标签，必须与下面模板中的同名标签完全一致
   template:
     metadata:
       labels:
-        app: <>       # 模板标签，必须与上面的选择器完全一致
-        env: <>       # 其余标签可以自行指定
+        app: webapp       # 模板标签，必须与上面的选择器完全一致
+        env: dev       # 其余标签可以自行指定
     spec:
       containers:
-        - name: <>    # 容器在 Pod 内部的名称
-          image: <>   # 镜像名称与标签
+        - name: webapp    # 容器在 Pod 内部的名称
+          image: webapp:v4   # 镜像名称与标签
           ports:
-            - containerPort: <>   # 容器监听的端口
+            - containerPort: 8080   # 容器监听的端口
+          resources: {}
