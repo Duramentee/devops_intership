@@ -342,3 +342,96 @@ Pod 名称的中间部分就是这个哈希值，它同时出现在三个位置�
 | 观察默认权限 | `touch /tmp/f1; mkdir /tmp/d1; ls -l /tmp/f1; ls -ld /tmp/d1` | 在当前掩码下创建文件与目录，比较两者权限的差异。 |
 | 观察掩码改变后的效果 | `(umask 027; touch /tmp/f2; mkdir /tmp/d2; stat -c '%a %n' /tmp/f2 /tmp/d2)` | 括号表示在子 shell 中执行，退出之后当前 shell 的掩码不受影响。预期输出为 `640` 与 `750`。 |
 | 对比减法与按位与非 | `(umask 027; touch /tmp/f3; stat -c '%a' /tmp/f3)` | 结果是 `640`；而按八进制做 `666 - 027` 得到 `637`，两者不同，说明必须使用按位与非。 |
+
+---
+
+## 九、十分钟速记卡
+
+> 用途：复习时只读这一节。内容与前面的小节重复是刻意的，重复的目的是不翻回正文就能回忆。
+
+### 9.1 四个对象各一句话
+
+| 对象 | 一句话定义 | 最容易说错的地方 |
+|---|---|---|
+| Pod | Kubernetes 中最小的可调度单位，也是一份「若干容器共享若干命名空间、必须运行在同一个节点上」的声明（`v1`/`Pod`），命名空间级对象 | 不能把 Pod 说成容器，一个 Pod 可以包含多个容器 |
+| Deployment | 一份「某个版本的 Pod 应该运行多少个副本」的声明，同时负责版本与滚动过程（`apps/v1`） | 它不直接创建 Pod，中间还有 ReplicaSet |
+| ReplicaSet | 持续对账，让匹配选择器的 Pod 数量等于 `spec.replicas` | 它不负责版本，只负责数量 |
+| 容器 | 由 kubelet 调用节点上的容器运行时创建，不是 API 对象 | 容器重启只增加 `RESTARTS`，Pod 的名称与 IP 不变 |
+
+### 9.2 必须记住的字段
+
+| 对象 | 字段 | 记住什么 |
+|---|---|---|
+| Pod | `metadata.labels` 与 `metadata.ownerReferences` | `ownerReferences` 由 API Server 写入，指向拥有者，例如 Pod 的拥有者是 ReplicaSet |
+| Pod | `spec.containers[]` | `name` 与 `image` 是必填；`ports[].containerPort` 只是声明，不产生任何网络规则 |
+| Pod | `spec.restartPolicy` | 默认值为 `Always`，执行这个动作的是节点上的 kubelet |
+| Pod | `spec.nodeName` | 通常为空，由调度器写入 |
+| Pod | `status` | 服务端字段，包含 `phase`、`podIP`、`startTime`、`conditions` 与 `containerStatuses[].restartCount` |
+| Deployment | `spec.selector` 与 `spec.template` | 两者必须匹配；`spec.selector` 创建之后不可修改 |
+| Deployment | `spec.replicas` 与 `spec.strategy` | 副本数默认 1；`RollingUpdate` 的 `maxSurge` 与 `maxUnavailable` 默认都是 25%（p.426） |
+| Deployment | `spec.revisionHistoryLimit` | 默认值为 10，保留多少个旧 ReplicaSet 用于回滚 |
+| ReplicaSet | `spec.selector` | 由 Deployment 创建时，其中会多出 `pod-template-hash` 这一项 |
+
+### 9.3 全链路摘要
+
+| 阶段 | 执行者 | 关键动作 |
+|---|---|---|
+| 1 | 我执行 `kind load docker-image` | 把镜像写入节点内部的容器运行时镜像库 |
+| 2 | kubectl 与 kube-apiserver | 客户端校验、服务端鉴权与准入控制、补全默认值（`restartPolicy`、`dnsPolicy`、`terminationGracePeriodSeconds` 为 30、`serviceAccountName` 为 `default`、标签不是 `latest` 时 `imagePullPolicy` 为 `IfNotPresent`）、写入 etcd、通过 watch 通知其他组件 |
+| 3 | kube-scheduler | 先过滤再打分，最后把绑定结果写入 `spec.nodeName`（p.495） |
+| 4 | 目标节点上的 kubelet | 创建沙箱与网络命名空间、调用 CNI 分配 IP、拉取或复用镜像、创建并启动容器、持续上报状态（p.504-505） |
+| 5 | Deployment 控制器 | 依据 `spec.template` 计算 `pod-template-hash`，创建带该哈希的 ReplicaSet |
+| 6 | ReplicaSet 控制器 | 按「期望副本数减实际副本数」的差值创建或删除 Pod |
+| 7 | 删除 Pod 时 | kubelet 先发送 TERM 再发送 KILL，ReplicaSet 控制器随后创建一个名称与 IP 都不同的新 Pod |
+| 8 | 删除 Deployment 时 | 依据 `ownerReferences` 逐层级联删除 ReplicaSet 与 Pod |
+
+### 9.4 今天实测出来的硬结论
+
+| 编号 | 结论 | 实测数据 |
+|---|---|---|
+| 1 | 同一个 Pod 内的容器共享 Network、UTS、IPC 三种命名空间，不共享 PID 与文件系统 | p.109-110 |
+| 2 | 删除并重建 Pod 之后，名称与 IP 都改变 | 本次依次观察到 `10.244.0.6`、`.7`、`.9`、`.10`、`.11` |
+| 3 | 裸 Pod 删除之后不会恢复，由 Deployment 管理的 Pod 会被补齐 | 删除 `webapp-7dbcc8ff4b-cz4vc` 之后出现 `webapp-7dbcc8ff4b-qpndp`，其 AGE 为 8 秒 |
+| 4 | 模板哈希同时出现在三个位置 | ReplicaSet 名称的后缀、ReplicaSet 选择器的一部分、Pod 名称的中间一段，本次为 `7dbcc8ff4b` |
+| 5 | 节点容器重启会重建沙箱 | 事件中出现 `SandboxChanged`，容器退出码为 `255`，Pod 的 `uid` 与创建时刻不变，IP 被重新分配 |
+| 6 | `containerPort` 不产生任何网络规则 | 不声明它时 `port-forward` 仍然可以工作 |
+
+### 9.5 面试问答卡标准答法
+
+| 问题 | 标准答法 |
+|---|---|
+| 同一个 Pod 内的容器共享哪些命名空间？文件系统共享吗？能监听同一个端口吗？ | 共享 Network、UTS、IPC 三种命名空间，因此共用 IP 地址、主机名与端口空间；文件系统默认互相隔离；两个容器不能监听同一个端口 |
+| `RESTARTS` 统计的是什么？ | 容器被重启的次数（对应 `status.containerStatuses[].restartCount`），第一次启动不计入；Pod 对象本身不会重启 |
+| 为什么宿主机 `docker images` 里的镜像 Kind 节点看不到？ | 两层的镜像库是独立的：宿主机上是 Docker 守护进程的镜像库，节点内部是 containerd 的镜像库，因此必须执行 `kind load docker-image` 把镜像复制过去 |
+| Docker 的 `-p` 与 `kubectl port-forward` 有什么区别？ | `-p` 由宿主内核的 netfilter 规则完成 DNAT，绑定 `0.0.0.0` 且随容器存续；`port-forward` 是用户态隧道（kubectl → API Server → kubelet），默认只监听 `127.0.0.1`，进程退出即失效，并且不经过 Service |
+
+### 9.6 出现异常时的排查顺序
+
+| 顺序 | 命令 | 看什么 |
+|---|---|---|
+| 1 | `kubectl get po -o wide` | Pod 是否处于 `Running`、`READY` 是否显示为 `1/1`、IP 地址与所在节点 |
+| 2 | `kubectl describe po <名称>` | 事件段落中的调度、拉取镜像、创建与启动四条记录 |
+| 3 | `kubectl logs <名称>` 与 `kubectl logs --previous` | 当前容器的输出与上一个被替换容器的输出 |
+| 4 | `kubectl get deploy,rs,po` | 三层对象的副本数量是否一致 |
+
+### 9.7 最容易答错的六点
+
+| 编号 | 错误说法 | 正确说法 |
+|---|---|---|
+| 1 | 「Pod 被重启了」 | 被重启的是容器；Pod 是一次性对象，删除即新建 |
+| 2 | 「Pod 的 IP 在整个生命周期内不变」 | 前提是沙箱不被重建；节点容器重启会重建沙箱并重新分配地址 |
+| 3 | 「`RESTARTS` 表示启动次数」 | 表示容器被重启的次数，第一次启动不计入 |
+| 4 | 「标签相同的裸 Pod 会被 Deployment 接管」 | Deployment 创建的 ReplicaSet 的选择器中还包含 `pod-template-hash`，因此不会选中缺少该标签的裸 Pod |
+| 5 | 「事件中的 `Pulled` 表示真的拉取了镜像」 | 本次事件的原文是 `already present on machine`，说明 kubelet 直接使用了节点上已有的镜像 |
+| 6 | 「`containerPort` 会被用来做端口映射」 | 它与 Dockerfile 的 `EXPOSE` 语义相同，都只是声明 |
+
+### 9.8 合上笔记自测六个问题
+
+| 编号 | 问题 | 判断标准 |
+|---|---|---|
+| 1 | 四层对象模型是什么 | Deployment → ReplicaSet → Pod → 容器 |
+| 2 | 副本数量由哪一层维持 | ReplicaSet 按「期望减实际」的差值维持 |
+| 3 | Deployment 为什么能够回滚 | 升级时保留旧的 ReplicaSet，回滚时把它的副本数量调大（p.422） |
+| 4 | 从提交清单到容器运行经过哪些组件 | kube-apiserver → kube-scheduler → kubelet → 容器运行时 |
+| 5 | 删除 Deployment 会连带删除什么 | 依据 `ownerReferences` 级联删除 ReplicaSet 与 Pod |
+| 6 | 判断沙箱是否被重建的依据 | 事件中的 `SandboxChanged`、`Last State` 的退出码、节点容器的启动时刻 |

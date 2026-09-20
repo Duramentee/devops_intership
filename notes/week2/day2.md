@@ -341,3 +341,96 @@ flowchart LR
 | 2. Pod 的 IP 地址变化之后为什么不会影响客户端访问？ | 因为客户端访问的是 Service 的固定虚拟地址与端口，而不是 Pod 的地址。Pod 被删除重建或者沙箱被重建时，变化的只是 Endpoints 对象中的地址清单，kube-proxy 更新规则之后新连接被转发到新的后端，ClusterIP 与客户端的配置都不需要修改。 | 讲解式完成。实测证据：删除一个 Pod 之后端点从 `10.244.0.3:8080` 变成 `10.244.0.9:8080`，而 `10.96.135.12` 保持不变。 |
 | 3. ClusterIP 与 NodePort 有什么区别？ | ClusterIP 只在集群内部可用，API Server 从服务地址段中分配一个虚拟地址，由 kube-proxy 写入转发规则；NodePort 在 ClusterIP 的基础上再叠加一层，在每个节点上开放一个处于 30000 至 32767 范围内的固定端口，到达该端口的数据包先被转发到 ClusterIP 与 `port` 的组合，再被转发到 Pod 的 `targetPort`，因此可以从集群外部访问。 | 讲解式完成。实测证据：`webapp` 的类型是 ClusterIP，取值是 `10.96.135.12:8080`；`webapp-nodeport` 的端口映射是 `8080:31873/TCP`。 |
 | 4. Service 到 Pod 的转发由哪个组件完成？ | 由每个节点上的 kube-proxy 完成规则写入，真正的数据包改写由节点内核依据这些规则执行。Service 对象本身没有进程，也不监听端口，因此不能说「Service 转发流量」。 | 讲解式完成。实测证据：删除 Service 之后同名端点对象消失，节点上的规则被移除；在节点容器内部访问 `localhost:31873` 得到 `HTTP/1.1 200 OK`，说明规则确实存在于节点上。 |
+
+---
+
+## 九、十分钟速记卡
+
+> 用途：复习时只读这一节。内容与前面的小节重复是刻意的，重复的目的是不翻回正文就能回忆。
+
+### 9.1 三个对象各一句话
+
+| 对象 | 一句话定义 | 最容易说错的地方 |
+|---|---|---|
+| Service | 一组 Pod 的稳定访问入口，是一个只有声明、没有进程的 API 对象（`v1`/`Service`），属于命名空间级对象 | 不能说「Service 转发流量」，它不监听端口也没有进程 |
+| Endpoints | 某个 Service 当前的后端地址清单，`metadata.name` 必须与 Service 同名，保存「Pod 的 IP 与端口」 | 它是一份独立的资源，不是 Service 的属性（p.223） |
+| EndpointSlice | 端点清单的分片（`discovery.k8s.io/v1`），单个分片最多 100 个端点，名称由控制器生成而不是与 Service 同名 | 它与 Endpoints 数据来源相同、内容等价，不是替代关系 |
+
+### 9.2 必须记住的字段
+
+| 对象 | 字段 | 记住什么 |
+|---|---|---|
+| Service | `spec.type` | 省略时默认 `ClusterIP`，另外可取 `NodePort`、`LoadBalancer`、`ExternalName` |
+| Service | `spec.selector` | 键值映射形式，取值必须与 Pod 模板标签一致；省略该字段时控制器不会创建 Endpoints，必须人工创建 |
+| Service | `spec.ports[].port` | 客户端访问 Service 时使用的端口 |
+| Service | `spec.ports[].targetPort` | 数据包被转发到 Pod 之后使用的端口，省略时默认等于 `port`，也可以写成容器端口的名称 |
+| Service | `spec.ports[].nodePort` | 仅 NodePort 与 LoadBalancer 可用，取值范围 30000 至 32767，省略时由 API Server 自动分配 |
+| Service | `spec.clusterIP` | 由 API Server 从服务地址段分配，手写清单时不要写；写成 `None` 得到 Headless Service |
+| Endpoints | `subsets[].addresses[]` | 处于就绪状态的地址；`notReadyAddresses[]` 保存尚未就绪的地址 |
+| Endpoints | `subsets[].ports[]` | 这一组地址开放的端口，`name` 用于与 Service 的多端口声明对应 |
+
+### 9.3 全链路摘要
+
+| 步骤 | 执行者 | 做了什么 |
+|---|---|---|
+| 1 | 客户端 Pod 的解析器 | 向 CoreDNS 查询 `<服务名>.<命名空间>.svc.cluster.local`，得到 ClusterIP |
+| 2 | 客户端所在节点的内核 | 数据包的目的地是 ClusterIP 与端口，命中 kube-proxy 写入的 nat 表规则 |
+| 3 | 客户端所在节点的内核 | 执行 DNAT，把目的地改写为某个就绪 Pod 的 `IP:targetPort`，同时写入连接跟踪记录 |
+| 4 | 节点内核与 CNI 插件 | 数据包经 veth 进入目标 Pod 的网络命名空间 |
+| 5 | 目标 Pod 所在节点的内核 | 回复数据包依据连接跟踪记录把源地址改回 ClusterIP，因此客户端始终只看到 ClusterIP |
+
+配套要记住四件事：Service 对象不是转发组件；写入规则的是每个节点上的 kube-proxy；真正改写数据包的是节点内核；负载均衡的粒度是每一条新连接，同一条连接内的请求固定落在同一个 Pod（p.233）。
+
+### 9.4 今天实测出来的硬结论
+
+| 编号 | 结论 | 实测数据 |
+|---|---|---|
+| 1 | Endpoints 的内容只包含「标签匹配且处于就绪状态」的 Pod | 基线两个 Pod 的 IP 是 `10.244.0.3` 与 `10.244.0.4`，端点列表正是这两个地址加端口 8080 |
+| 2 | Pod 重建只替换端点条目，客户端使用的地址不变 | 端点由 `10.244.0.3:8080` 换成 `10.244.0.9:8080`，ClusterIP 始终是 `10.96.135.12` |
+| 3 | Service 没有后端时，kube-proxy 写入的是拒绝规则而不是静默丢弃 | 选择器改成不匹配任何取值之后，客户端立刻得到 `Connection refused`，而不是等到超时 |
+| 4 | 选择器写错不会导致创建失败，也不会产生事件 | Service 正常存在且可读，只有 Endpoints 变为 `<none>` |
+| 5 | 删除 Service 时同名的 Endpoints 对象一起被删除 | `kubectl get endpoints webapp-nodeport` 返回 `Error from server (NotFound)` |
+| 6 | 一个真实的「无选择器加人工端点」例子 | 默认命名空间的 `kubernetes`（`10.96.0.1:443`）没有 `spec.selector`，其端点指向节点地址 `172.18.0.2:6443` |
+| 7 | 环境变量形式只描述入口，不承担负载均衡 | `WEBAPP_SERVICE_HOST=10.96.135.12` 与 `WEBAPP_PORT=tcp://10.96.135.12:8080` |
+
+### 9.5 面试问答卡标准答法
+
+| 问题 | 标准答法 |
+|---|---|
+| Service 通过什么机制找到 Pod？ | 通过 `spec.selector` 筛选 Pod，由 Endpoints 控制器把「标签匹配且就绪」的地址写入同名 Endpoints 与 EndpointSlice，kube-proxy 再据此写入转发规则 |
+| Pod 的 IP 变化为什么不影响客户端？ | 客户端访问的是固定的 ClusterIP，Pod 地址变化只更新端点对象，新连接被转发到新的后端 |
+| ClusterIP 与 NodePort 的区别？ | ClusterIP 只在集群内可用；NodePort 在每个节点上再开放一个固定端口，数据包先到 ClusterIP 再到 Pod，因此外部可以访问 |
+| 谁完成 Service 到 Pod 的转发？ | kube-proxy 写入规则、节点内核执行 DNAT；Service 对象本身没有进程也不监听端口 |
+
+### 9.6 出现「访问不通」时的排查顺序
+
+| 顺序 | 命令 | 看什么 |
+|---|---|---|
+| 1 | `kubectl get endpoints <服务名>` | 端点是否为空；为空说明选择器不匹配或者 Pod 未就绪 |
+| 2 | `kubectl describe svc <服务名>` | `Selector`、`Port`、`TargetPort`、`Endpoints` 四行 |
+| 3 | `kubectl get po --show-labels` | 标签是否与选择器一致，`READY` 是否显示为 `1/1` |
+| 4 | `kubectl exec -it <Pod 名称> -- wget -qO- http://<服务名>:8080` | 集群内部能否访问，用于区分是 Service 问题还是外部网络问题 |
+| 5 | 在节点容器内部执行 `curl http://localhost:<节点端口>/` | NodePort 的转发规则是否存在 |
+
+### 9.7 最容易答错的七点
+
+| 编号 | 错误说法 | 正确说法 |
+|---|---|---|
+| 1 | 「Service 转发流量」 | Service 只是声明，转发规则由 kube-proxy 写入，数据包由节点内核改写 |
+| 2 | 「ping 不通 ClusterIP 说明服务有问题」 | ClusterIP 是虚拟地址，Service 的本质是 IP 与端口对的集合，而 ICMP 没有端口概念，因此 ping 不通属于正常现象 |
+| 3 | 「选择器写错会报错」 | Service 创建成功且没有事件，只有 Endpoints 变为空 |
+| 4 | 「Pod 被重启了」 | 被重启的只有容器（`RESTARTS` 增加）；Pod 是一次性对象，删除即新建 |
+| 5 | 「Pod 的 IP 在生命周期内绝对不变」 | 前提是沙箱不被重建；节点容器或容器运行时重启会重建沙箱并重新分配地址，判断依据是 `SandboxChanged` 事件 |
+| 6 | 「环境变量会随 Service 更新」 | 变量在创建容器时注入，是快照；约束条件是 Service 先于容器的创建存在，不是先于 Pod 对象存在 |
+| 7 | 「`kubectl get endpoints` 可以一直用」 | 集群版本 v1.37 起 v1 Endpoints 已经废弃，官方推荐 `kubectl get endpointslices -o wide` |
+
+### 9.8 合上笔记自测六个问题
+
+| 编号 | 问题 | 判断标准 |
+|---|---|---|
+| 1 | 说出 Service 与 Endpoints 各自回答的问题 | 一个回答「客户端访问哪里」，一个回答「这个地址背后现在有谁」 |
+| 2 | 说出四层对象模型 | Service → Endpoints 或 EndpointSlice → kube-proxy 规则 → Pod |
+| 3 | `port` 与 `targetPort` 分别给谁用 | 前者给客户端，后者给 Pod |
+| 4 | 端点列表为空时客户端的表现是什么 | 连接被拒绝，不是等到超时 |
+| 5 | 环境变量的两组命名规则 | 服务名转大写、短横线转下划线，再加 `_SERVICE_HOST` 与 `_PORT` |
+| 6 | 三种类型各在第几层工作，哪一种 Kind 集群做不了 | 都在第 4 层，LoadBalancer 在 Kind 集群中做不了 |
