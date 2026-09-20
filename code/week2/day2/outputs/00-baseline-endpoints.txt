@@ -1,0 +1,2 @@
+NAME         ENDPOINTS         AGE
+kubernetes   172.18.0.2:6443   22d

@@ -29,21 +29,33 @@
 | 3 | 用 `kubectl run --dry-run=client -o yaml` 生成 YAML 模板，并逐字段阅读 | ✅ | `outputs/00-dry-run-pod.yaml`、`outputs/00b-dry-run-deploy.yaml` |
 | 4 | 自己编写 `code/week2/day1/pod.webapp.yaml` 并创建裸 Pod | ✅ | 同上 |
 | 5 | 执行 `kubectl get po -o wide`、`kubectl describe po`、`kubectl logs` | ✅ | `outputs/01-po-wide.txt` |
-| 6 | 执行 `kubectl port-forward`，并在另一个终端执行 `curl` 验证 | ⬜ | 待确认 |
-| 7 | 执行 `kubectl exec` 进入容器，查看 `/proc/1/cmdline`、`hostname`、`env` | ⬜ | 待确认 |
-| 8 | 删除裸 Pod，确认它不会自动恢复 | ⬜ | 待确认 |
+| 6 | 执行 `kubectl port-forward`，并在另一个终端执行 `curl` 验证 | ✅ | `outputs/03-port-forward.txt` |
+| 7 | 执行 `kubectl exec` 进入容器，查看 `/proc/1/cmdline`、`hostname`、`env` | ✅ | 结果与遇到的问题记录在本节末尾的「容器内查看进程与环境的两个操作问题」表 |
+| 8 | 删除裸 Pod，确认它不会自动恢复 | ✅ | 间接证据：Day 2 的基线记录中不存在名为 `webapp` 的裸 Pod，集群中只有 Deployment 管理的两个 Pod |
 | 9 | 编写并创建 `code/week2/day1/deploy.webapp.yaml`（副本数量为 3） | ✅ | 同上 |
 | 10 | 执行 `kubectl get deploy,rs,po` 同时观察三层对象 | ✅ | `outputs/02-three-layers.txt` |
 | 11 | 删除一个由 Deployment 管理的 Pod，确认控制器自动补齐 | ✅ | 同上 |
 | 12 | 执行 `kubectl scale` 完成一次扩容与一次缩容 | ✅ | 同上 |
-| 13 | 完成 Linux 每日一题 Day 8（umask） | ⬜ | 待完成 |
-| 14 | 回答当天的面试问答卡（四道题，见 `plan/week2/任务明细.md`） | ⬜ | 待完成 |
+| 13 | 完成 Linux 每日一题 Day 8（umask） | ✅ 讲解式完成 | 见第八节 |
+| 14 | 回答当天的面试问答卡（四道题，见 `plan/week2/任务明细.md`） | ✅ 批改完成 | 见第七节 |
 
 ---
 
 ## 三、概念（机制，用自己的话写）
 
-### 3.1 Pod 是什么
+> 阅读顺序建议：先读 3.1 至 3.3，弄清 Pod、Deployment、ReplicaSet 这三个对象各自是什么；再读 3.4 的对象关系；然后读 3.5 的完整工作链路，把三个对象放进一次部署的全过程中；最后读 3.6 与 3.7 的模型对照与推论。
+
+### 3.1 Pod 对象本身
+
+| 问题 | 答案 |
+|---|---|
+| 它是什么类型的东西？ | 它既是 Kubernetes 中最小的可调度单位，也是一种内置 API 资源（`apiVersion: v1`、`kind: Pod`），内容是一份「若干容器共享若干命名空间、并且必须运行在同一个节点上」的声明。 |
+| 它属于哪个层级？ | 它属于命名空间级对象，因此 `kubectl get po` 默认只列出当前命名空间中的 Pod。 |
+| 谁创建它？ | 可以由我直接创建，这种 Pod 称为裸 Pod；也可以由控制器创建，例如 ReplicaSet、DaemonSet、Job。由控制器创建时，Pod 的 `metadata.ownerReferences` 字段会指向创建它的控制器对象，这是判断「这个 Pod 属于谁」的权威依据。 |
+| 它的生命周期是怎样的？ | Pod 是一次性对象：删除它就等于新建一个全新的 Pod，名称与 IP 地址都会改变。可以被重启的只有容器这一层（表现为 `RESTARTS` 计数增加），Pod 对象本身不会重启。这里需要补一个限定条件：`status.podIP` 在生命周期内保持不变的前提是**沙箱不被重建**；节点容器重启或节点上的容器运行时重启会重建沙箱并重新分配地址，判断依据是事件中的 `SandboxChanged`，而 Pod 的 `uid` 与 `metadata.creationTimestamp` 仍然不变（该限定条件由 Day 2 的实测确认）。 |
+| 它是不是容器？ | 不是。一个 Pod 可以包含多个容器，这些容器共享 Network、UTS、IPC 三种命名空间（p.109-110），但它们的文件系统默认互相隔离。 |
+
+#### 3.1.1 Pod 内部容器的共享范围（Day 1 实测结论）
 
 | 问题 | 答案 |
 |---|---|
@@ -53,7 +65,152 @@
 | 同 Pod 两容器能绑同一端口吗？为什么？ | 不能，因为端口空间是共用的，第二个容器绑定该端口时会返回地址已被占用的错误。 |
 | 不同 Pod 的端口会冲突吗？为什么？ | 不会，因为每个 Pod 拥有独立的网络命名空间，端口空间彼此独立。 |
 
-### 3.2 与 Docker 的对应关系（本周的模型切换）
+#### 3.1.2 Pod 对象的字段清单
+
+| 字段 | 是否必须 | 含义 |
+|---|---|---|
+| `apiVersion: v1` 与 `kind: Pod` | 必须 | 声明这是一个 Pod 对象。 |
+| `metadata.name` | 必须，与 `metadata.generateName` 二者取一 | Pod 的名称。由控制器创建时，名称由控制器生成，结构为 `<控制器名称>-<随机后缀>`。 |
+| `metadata.namespace` | 可选 | 省略时使用当前上下文的命名空间。 |
+| `metadata.labels` | 可选 | 供标签选择器匹配使用。ReplicaSet 判断「这个 Pod 是否属于我」时会同时依据标签与 `ownerReferences` 两个信息。 |
+| `metadata.ownerReferences` | 由 API Server 写入 | 一个对象创建另一个对象时自动写入，指向拥有者。例如 Pod 的拥有者是 ReplicaSet，ReplicaSet 的拥有者是 Deployment。 |
+| `spec.containers[]` | 必须 | 容器列表，常用子字段是 `name`（必须，并且在 Pod 内唯一）、`image`（必须）、`ports[].containerPort`（只是声明，不产生任何网络规则）、`env`、`volumeMounts`、`command` 与 `args`、`resources`（其中 `requests` 与 `limits` 在第 3 周介绍）、`livenessProbe` 与 `readinessProbe`（第 2 周 Day 4 介绍）。 |
+| `spec.restartPolicy` | 可选，默认值为 `Always` | 容器退出之后的处理方式，取值可以是 `Always`、`OnFailure`、`Never`。执行这个动作的是容器所在节点上的 kubelet。 |
+| `spec.nodeName` | 通常为空，由调度器写入 | Pod 被调度到哪一个节点。手写清单时通常不写该字段；一旦写死，调度器就不再参与选择。 |
+| `spec.volumes[]` | 可选 | Pod 级的卷声明，可以被 Pod 内的多个容器同时挂载，这是同一个 Pod 内多个容器共享文件的方式（第 3 周介绍）。 |
+| `spec.dnsPolicy` | 可选，默认值为 `ClusterFirst` | 域名解析策略，它决定容器内的 `/etc/resolv.conf` 指向 CoreDNS，还是沿用节点上的解析配置。 |
+| `spec.terminationGracePeriodSeconds` | 可选，默认值为 30 | 删除 Pod 时，kubelet 先向容器主进程发送 TERM 信号，等待这段时间之后如果进程仍然存在，再发送 KILL 信号。 |
+| `spec.serviceAccountName` | 可选，默认值为 `default` | Pod 用哪一个 ServiceAccount 的身份访问 API Server；因此每个 Pod 默认会挂载一个令牌卷（第 5 周介绍）。 |
+| `status` | 服务端字段 | 由 kubelet 上报、由 API Server 写入。常用子字段是 `phase`、`podIP`、`hostIP`、`startTime`、`conditions[]`（其中 `Ready` 表示是否通过就绪判定）与 `containerStatuses[].restartCount`（也就是 `RESTARTS` 这一列的来源）。 |
+
+### 3.2 Deployment 对象本身
+
+| 问题 | 答案 |
+|---|---|
+| 它是什么类型的东西？ | 它是一种内置 API 资源（`apiVersion: apps/v1`、`kind: Deployment`），内容是一份「某个版本的 Pod 应该运行多少个副本」的声明，并且负责在版本发生变化时以滚动方式替换副本（第 9 章，p.413-438）。 |
+| 它属于哪个层级？ | 命名空间级对象。 |
+| 它直接创建 Pod 吗？ | 不直接创建。它创建 ReplicaSet，再由 ReplicaSet 创建 Pod，因此从提交到运行一共存在四层对象：Deployment → ReplicaSet → Pod → 容器。 |
+| 它为什么能够回滚？ | 因为升级时它不会删除旧的 ReplicaSet，而只是把旧 ReplicaSet 的副本数量调小；回滚时把旧 ReplicaSet 的副本数量重新调大即可（p.422）。 |
+
+#### 3.2.1 Deployment 对象的字段清单
+
+| 字段 | 是否必须 | 含义 |
+|---|---|---|
+| `apiVersion: apps/v1` 与 `kind: Deployment` | 必须 | 声明这是一个 Deployment 对象。 |
+| `metadata.name` | 必须 | Deployment 的名称，它同时是它创建的 ReplicaSet 名称的前缀。 |
+| `spec.replicas` | 可选，默认值为 1 | 期望的 Pod 副本数量；实际的增减由 ReplicaSet 控制器执行。 |
+| `spec.selector` | 必须，并且创建之后不可修改 | 用来判断哪些 Pod 属于本次部署。Deployment 控制器会在它之上追加 `pod-template-hash` 标签，再把这组选择器交给 ReplicaSet。 |
+| `spec.template` | 必须 | Pod 模板，其中 `metadata.labels` 必须与 `spec.selector` 匹配，否则 API Server 会拒绝创建。 |
+| `spec.strategy` | 可选，默认值为 `RollingUpdate` | 升级方式。`RollingUpdate` 的两个子字段是 `maxSurge` 与 `maxUnavailable`，默认值都是 25%（p.426）；取值为 `Recreate` 时会先删除全部旧 Pod 再创建新的。 |
+| `spec.revisionHistoryLimit` | 可选，默认值为 10 | 保留多少个旧的 ReplicaSet 用于回滚。 |
+| `spec.minReadySeconds` | 可选，默认值为 0 | 一个新 Pod 需要保持就绪多少秒之后，才被算作本次升级取得的进展。 |
+| `status` | 服务端字段 | 由控制器写入，常用子字段是 `replicas`、`readyReplicas`、`updatedReplicas`、`availableReplicas` 与 `observedGeneration`。 |
+
+### 3.3 ReplicaSet 对象本身
+
+| 问题 | 答案 |
+|---|---|
+| 它是什么类型的东西？ | 它是一种内置 API 资源（`apiVersion: apps/v1`、`kind: ReplicaSet`），职责是持续对账，让「匹配选择器的 Pod 数量」始终等于 `spec.replicas`（p.183）。 |
+| 它的对账过程是怎样的？ | 它先计算「期望副本数」与「实际副本数」的差值：差值为正时用 `spec.template` 创建新的 Pod，差值为负时删除多余的 Pod（p.163，教材以 ReplicationController 为例描述了同一套操作）。 |
+| 它与 Deployment 的分工是什么？ | Deployment 负责版本与滚动过程，ReplicaSet 负责数量，因此同一份声明被拆成「改成什么版本」与「保持多少个」两件事。 |
+| 它创建的 Pod 有什么特征？ | Pod 的名称是 `<ReplicaSet 名称>-<随机后缀>`，而 ReplicaSet 名称又是 `<Deployment 名称>-<pod-template-hash>`，因此 Pod 名称的中间一段就是模板哈希。 |
+
+#### 3.3.1 ReplicaSet 对象的字段清单
+
+| 字段 | 是否必须 | 含义 |
+|---|---|---|
+| `apiVersion: apps/v1` 与 `kind: ReplicaSet` | 必须 | 声明这是一个 ReplicaSet 对象。 |
+| `spec.replicas` | 可选，默认值为 1 | 期望的 Pod 副本数量。 |
+| `spec.selector` | 必须 | 标签选择器。它可以写成 `matchLabels` 形式，也可以写成表达力更强的 `matchExpressions` 形式（p.185）；由 Deployment 创建时，其中会多出 `pod-template-hash` 这一项。 |
+| `spec.template` | 必须 | Pod 模板，包括标签与容器定义。模板发生变化时会触发 Pod 的替换。 |
+| `status` | 服务端字段 | 常用子字段是 `replicas`、`fullyLabeledReplicas`、`readyReplicas`、`availableReplicas` 与 `observedGeneration`。 |
+
+### 3.4 三个对象之间的关系
+
+| 对象 | 由谁创建 | 靠哪些字段与下一层关联 | 负责维持什么 | `ownerReferences` 指向 |
+|---|---|---|---|---|
+| Deployment | 我执行 `kubectl apply` 创建 | `spec.template` 与 `spec.selector`；它为自己创建的 ReplicaSet 生成带 `pod-template-hash` 的名称与标签 | 期望的副本数量与版本历史（保留旧的 ReplicaSet） | 无，因为它由我直接创建 |
+| ReplicaSet | Deployment 控制器 | `spec.selector`（其中包含 `pod-template-hash`）与 `spec.template` | 匹配选择器的 Pod 数量等于 `spec.replicas` | Deployment |
+| Pod | ReplicaSet 控制器 | 模板中的 `metadata.labels`，同时写入 `ownerReferences` | 容器持续运行；容器退出时由 kubelet 按 `restartPolicy` 重启 | ReplicaSet |
+| 容器 | kubelet 调用节点上的容器运行时 | Pod 中 `containers[]` 的 `image` 与 `command` | 进程的运行与重启 | 不适用，因为容器不是 API 对象 |
+
+本次实测的证据是哈希 `7dbcc8ff4b` 同时出现在三个位置：ReplicaSet 名称的后缀、ReplicaSet 选择器的一部分、Pod 名称的中间一段。
+
+### 3.5 从提交清单到容器运行、再到删除后补齐的完整工作链路
+
+> 下面把整个过程拆成六个阶段。每个阶段都列出执行者、输入、动作、产生的对象或状态变化与观察方式。其中标注为「补充」的内容是我补充的执行顺序，教材第 11 章 11.1.7（p.504-505）只概述了 kubelet 的职责，没有逐条展开沙箱与网络的具体创建顺序。
+
+```mermaid
+flowchart LR
+  A[kubectl 提交清单] --> B[kube-apiserver 校验并补全默认值]
+  B --> C[(etcd 持久化)]
+  B -. watch 通知 .-> D[kube-scheduler 选择节点]
+  D -->|写入 spec.nodeName| B
+  B -. watch 通知 .-> E[目标节点上的 kubelet]
+  E -->|调用容器运行时创建沙箱与容器| F[容器运行]
+  E -->|上报状态| B
+  B -. watch 通知 .-> G[Deployment 控制器]
+  G -->|创建| H[ReplicaSet]
+  H -. watch 通知 .-> I[ReplicaSet 控制器]
+  I -->|创建| J[Pod 对象]
+```
+
+#### 阶段一：镜像进入节点内部的镜像库
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 1 | 我执行 `kind load docker-image webapp:v4` | 宿主机 Docker 守护进程镜像库中的镜像 | 把镜像层打包并导入节点容器内部的容器运行时镜像库 | 节点镜像库中出现该镜像，引用名形如 `import-2026-09-18@sha256:…` | 补充命令：`docker exec kind-control-plane crictl images` |
+
+#### 阶段二：裸 Pod 从提交到运行
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 2 | kubectl 客户端 | `pod.webapp.yaml` | 读取文件，执行客户端校验，然后向 API Server 发送创建请求（p.121） | 生成请求体，此时集群中还没有任何对象 | `kubectl create -f pod.webapp.yaml --dry-run=client -o yaml` |
+| 3 | kube-apiserver，负责认证、鉴权、准入控制与默认值补全 | 请求体 | 确认身份，执行鉴权，再由准入控制器校验字段，然后补全默认值：`restartPolicy` 设为 `Always`、`dnsPolicy` 设为 `ClusterFirst`、`terminationGracePeriodSeconds` 设为 30、`serviceAccountName` 设为 `default`，并且在标签不是 `latest` 时把 `imagePullPolicy` 设为 `IfNotPresent` | 得到一个字段完整的 Pod 对象，此时 `spec.nodeName` 仍然为空 | `kubectl get po webapp -o yaml`，观察我未写出的字段 |
+| 4 | kube-apiserver，负责持久化与通知 | 字段完整的对象 | 把对象写入 etcd，并通过 watch 机制把变更推送给正在监听 Pod 的客户端（p.493） | etcd 中新增一条记录 | 没有可以直接使用的观察命令 |
+| 5 | kube-scheduler | 「尚未绑定节点」的 Pod 列表与各节点的资源与约束信息 | 先执行过滤，排除不满足约束的节点；再执行打分，选出得分最高的节点；最后向 API Server 提交绑定结果（p.495） | Pod 的 `spec.nodeName` 被写入 | `kubectl get po -o wide` 的 `NODE` 列；`kubectl describe po webapp` 的 Events 中出现 `Scheduled` |
+| 6 | 目标节点上的 kubelet | 被绑定到本节点的 Pod | 补充说明的执行顺序：先为 Pod 创建沙箱容器并建立网络命名空间，再调用 CNI 插件为沙箱分配 IP，然后从镜像库拉取或复用镜像，最后创建并启动业务容器 | 容器开始运行，`status.podIP` 被写入（本次实测为 `10.244.0.6`） | `kubectl describe po webapp` 的 Events 中出现 `Pulled`、`Created`、`Started` 三条记录 |
+| 7 | 目标节点上的 kubelet，持续监控 | 容器的运行状态 | 按照教材的概括，kubelet 持续监控容器的运行，向 API Server 报告状态、事件与资源消耗；容器退出时按 `restartPolicy` 重启容器，探针报错时也由它重启容器（p.504-505） | `READY` 变为 `1/1`，`RESTARTS` 计数可能增加 | `kubectl get po` 的 `READY` 与 `RESTARTS` 两列；`kubectl logs --previous` |
+
+#### 阶段三：Deployment 路径（由两级控制器接手）
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 8 | kubectl 客户端与 kube-apiserver | `deploy.webapp.yaml` | 与第 2 至第 4 步相同的校验、默认值补全（`replicas`、`strategy`、`revisionHistoryLimit`）与持久化过程 | Deployment 对象存在并被写入 etcd | `kubectl get deploy webapp -o yaml` |
+| 9 | Deployment 控制器，运行在 kube-controller-manager 中（p.498） | 新建的 Deployment 对象 | 依据 `spec.template` 计算出 `pod-template-hash`，创建（或者在模板哈希相同时收养）一个名称与标签都带该哈希的 ReplicaSet，并把副本数量写给它 | 出现 ReplicaSet，例如 `webapp-7dbcc8ff4b` | `kubectl get rs`；`kubectl get rs webapp-7dbcc8ff4b -o yaml`，观察选择器中多出的 `pod-template-hash` |
+| 10 | ReplicaSet 控制器 | ReplicaSet 对象与匹配选择器的现有 Pod 列表 | 计算「期望副本数」与「实际副本数」的差值，差值为正时用 `spec.template` 创建新的 Pod 对象，并写入指向该 ReplicaSet 的 `ownerReferences` | 出现带哈希前缀的 Pod，例如 `webapp-7dbcc8ff4b-cz4vc` | `kubectl get po --show-labels` |
+| 11 | kube-scheduler 与 kubelet | 新创建的 Pod 对象 | 与阶段二的第 5 至第 7 步完全相同：调度到某个节点、创建沙箱与容器、上报状态 | 新 Pod 进入 `Running` 且 `READY` 为 `1/1` | `kubectl get po -o wide` |
+| 12 | Deployment 控制器，持续对账 | Deployment 对象与它管理的全部 ReplicaSet 的状态 | 比较期望副本数与各 ReplicaSet 的实际副本数，必要时调整，并把结果写回自身的 `status` | `readyReplicas` 与 `updatedReplicas` 等字段被更新 | `kubectl get deploy` 的 `READY` 与 `UP-TO-DATE` 两列 |
+
+#### 阶段四：删除一个 Pod 之后的补齐（本次观察到的自愈行为）
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 13 | 我执行 `kubectl delete po <名称>` | Pod 名称 | kube-apiserver 为该对象写入 `deletionTimestamp`，随后把它从 etcd 中删除 | Pod 进入 `Terminating`，最终消失 | `kubectl get po -w` |
+| 14 | 该 Pod 所在节点上的 kubelet | 删除事件 | 先向容器主进程发送 TERM 信号，等待 `terminationGracePeriodSeconds` 指定的时间之后如果进程仍然存活则发送 KILL 信号，然后回收沙箱与 IP 地址（p.505） | 容器进程终止，Pod 的 IP 被回收 | `kubectl describe po` 的 Events |
+| 15 | ReplicaSet 控制器 | 匹配选择器的 Pod 数量少于期望值 | 一次对账中发现差值为正，于是创建一个新的 Pod 对象 | 出现名称与 IP 都与被删除的那个不同的新 Pod | 对比删除前后的 `kubectl get po -o wide` 输出 |
+| 16 | kube-scheduler 与 kubelet | 新创建的 Pod | 重新执行调度、沙箱创建、IP 分配与容器启动 | 新 Pod 进入 `Running` 且 `READY` 为 `1/1` | 与上一行相同 |
+| 17 | 机制总结 | 上述全过程 | Deployment 与 ReplicaSet 两个对象的内容在这段时间里没有发生变化 | 被替换的只有 Pod 这一层的对象，因此自愈行为发生在 Pod 这一层，并且由 ReplicaSet 控制器完成 | 对比两次 `kubectl get po` 与一次 `kubectl get rs` |
+
+#### 阶段五：调整副本数量（扩容与缩容）
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 18 | 我执行 `kubectl scale deploy webapp --replicas=4` | 期望副本数 4 | kube-apiserver 更新 Deployment 对象的 `spec.replicas` | Deployment 的字段发生变化 | `kubectl get deploy webapp -o yaml` |
+| 19 | Deployment 控制器 | Deployment 的更新事件 | 把新的副本数量写给它管理的 ReplicaSet | ReplicaSet 的 `spec.replicas` 变为 4 | `kubectl get rs` |
+| 20 | ReplicaSet 控制器 | 期望数量与实际数量之间的差值 | 差值为正时创建 Pod，差值为负时删除 Pod | Pod 数量等于期望值 | `kubectl get po` |
+| 21 | 本次的遗留疑问 | 缩容过程 | 控制器在删除 Pod 时遵循某种排序规则（本次观察到被删除的是两个较新的 Pod），该排序规则属于实现细节 | 不适用 | 已记录在第六节 |
+
+#### 阶段六：删除 Deployment 时的级联清理
+
+| 序号 | 执行者 | 输入 | 动作 | 产生的对象或状态变化 | 观察方式 |
+|---|---|---|---|---|---|
+| 22 | 我执行 `kubectl delete deploy webapp` | 删除命令 | kube-apiserver 删除 Deployment 对象，并依据 `ownerReferences` 触发级联删除 | Deployment 对象消失 | `kubectl get deploy` |
+| 23 | 垃圾回收控制器 | ReplicaSet 对象上的 `ownerReferences` 指向已经消失的 Deployment | 删除该 Deployment 名下的全部 ReplicaSet | ReplicaSet 对象消失 | `kubectl get rs` |
+| 24 | 垃圾回收控制器与 kubelet | Pod 对象上的 `ownerReferences` 指向已经消失的 ReplicaSet | 删除这些 Pod，并由各个节点上的 kubelet 终止容器 | Pod 对象消失，容器停止运行 | `kubectl get po` |
+| 25 | 与裸 Pod 的对比结论 | 上述全过程 | 由控制器管理的对象链被整条删除；而我直接创建的裸 Pod 只有自己一个对象，删除它不会牵连任何其他对象 | 不适用 | 对比两次删除命令的输出 |
+
+### 3.6 与 Docker 的对应关系（本周的模型切换）
 
 | 维度 | Docker（第 1 周） | Kubernetes（第 2 周） |
 |---|---|---|
@@ -63,7 +220,7 @@
 | 进程退出 | 需要自己执行 `docker start` | kubelet 根据 `restartPolicy`（Pod 的默认值为 `Always`）自动重启容器 |
 | 容器被删除 | 不会自动恢复 | 由 ReplicaSet 控制器创建一个新的 Pod 来补齐副本数量 |
 
-### 3.3 Deployment 与 ReplicaSet 的关系
+### 3.7 Deployment 与 ReplicaSet 的关系（补充说明）
 
 | 问题 | 答案 |
 |---|---|
@@ -113,6 +270,7 @@ Pod 名称的中间部分就是这个哈希值，它同时出现在三个位置�
 | 3 | 把事件中的 `Pulled` 理解为真的拉取了镜像 | 误认为每次启动容器都会从远程仓库下载镜像 | 本次事件的原文是 `Container image "webapp:v4" already present on machine`，说明 kubelet 直接使用了节点上已有的镜像。原因是在镜像标签不是 `latest` 的情况下，`imagePullPolicy` 的默认值为 `IfNotPresent`。 |
 | 4 | 认为标签相同的裸 Pod 会被 Deployment 接管 | 预期副本数量会变成 4 个 | Deployment 生成的 ReplicaSet，其选择器中还包含 `pod-template-hash`，因此不会选中缺少该标签的裸 Pod。 |
 | 5 | 忽略 `describe` 输出中的其他字段 | 不清楚 `QoS Class`、`Tolerations`、`Mounts` 的含义 | `QoS Class: BestEffort` 说明没有设置资源请求与限制（第 3 周介绍）；`Tolerations` 是默认添加的容忍（第 3 周介绍）；`Mounts` 中的 `kube-api-access-…` 是自动挂载的 ServiceAccount 令牌卷（第 5 周介绍）。 |
+| 6 | 用 `status.startTime` 或 IP 的取值判断 Pod 是否被重建 | 看到 IP 变化就认为 Pod 被重建了 | 判断 Pod 是否被重建要看 `metadata.uid` 与 `metadata.creationTimestamp`；`status.podIP` 只表示当前沙箱的地址，节点容器重启或容器运行时重启会重建沙箱并重新分配地址，此时事件中出现 `SandboxChanged`，`RESTARTS` 计数随之增加（该结论由 Day 2 的实测确认，证据在 `code/week2/day2/outputs/07-fix-and-verify.txt`）。 |
 
 ---
 
@@ -132,7 +290,7 @@ Pod 名称的中间部分就是这个哈希值，它同时出现在三个位置�
 | 2. `RESTARTS` 统计的是什么？ | 不确定，认为是启动次数；Pod 不是持久对象；IP 每次启动都会变 | 三个需要修正的点：① 统计的是**容器被重启的次数**，第一次启动不计入，因此 `RESTARTS 0` 表示从未重启；② Pod 的 IP 在**生命周期内不变**，只有 Pod 被删除并重建之后才会获得新 IP；③ 与 Docker 容器对比的方向是正确的（Docker 容器的可写层在 stop 与 start 之间保留，而 Pod 删除即新建）。 |
 | 3. 为什么宿主机 `docker images` 里有的镜像，kind 节点看不到？ | kind 是运行在 Docker 容器里的集群，因此被隔离，节点读不到外部 Docker 的镜像 | 方向正确。更精确的表述是：两层各自拥有**独立的镜像库**。宿主机上是 Docker 守护进程的镜像库，节点容器内部是 containerd 的镜像库，两者是不同的存储目录，因此必须用 `kind load docker-image` 把镜像复制过去。 |
 | 4. Docker 的 `-p` 与 `kubectl port-forward` 在机制上有什么区别？ | `-p` 是宿主机端口到容器端口的映射，会按字面暴露；Kubernetes 中的端口声明不是强制的；`port-forward` 与 Service 有关 | 方向部分正确，需要补充机制：`-p` 由**内核**的 netfilter 规则完成 DNAT；`containerPort` 与 Dockerfile 的 `EXPOSE` 一样只是声明；`port-forward` 是**用户态隧道**（kubectl → API Server → kubelet → 容器），**不经过 Service**，是绕过 Service 的临时调试通道。 |
-
+> 补充实测证据（2026-09-20）：执行 `kubectl port-forward po/webapp-7dbcc8ff4b-qs5xh 8888:8080`，然后在另一个终端执行 `curl --noproxy '*' -i http://127.0.0.1:8888/`，得到 `HTTP/1.1 200 OK` 与 `<h1>Hello DevOps</h1>`。整个过程中没有使用 Service 对象，因此这条通道与 Service 是两条独立的访问路径；原始输出见 `outputs/03-port-forward.txt`。
 ### 容器内查看进程与环境的两个操作问题
 
 | 现象 | 原因 | 正确做法 |

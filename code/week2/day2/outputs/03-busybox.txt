@@ -1,0 +1,9 @@
+<h1>Hello DevOps</h1>
+<h1>Hello DevOps</h1>
+pod "tmp" deleted from default namespace
+
+# 另外终端还有输出:
+❯ kubectl run tmp --image=busybox:1.36 --rm -it --restart=Never -- wget -qO- http://webapp:8080 >> outputs/03-busybox.txt
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+warning: couldn't attach to pod/tmp, falling back to streaming logs: unable to upgrade connection: container tmp not found in pod tmp_default

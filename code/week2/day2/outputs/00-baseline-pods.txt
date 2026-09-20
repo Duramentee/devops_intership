@@ -1,0 +1,3 @@
+NAME                      READY   STATUS    RESTARTS      AGE   IP           NODE                 NOMINATED NODE   READINESS GATES   LABELS
+webapp-7dbcc8ff4b-pvr9k   1/1     Running   1 (49s ago)   24h   10.244.0.3   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=7dbcc8ff4b
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   1 (49s ago)   24h   10.244.0.4   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=7dbcc8ff4b

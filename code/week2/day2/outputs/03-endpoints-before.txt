@@ -1,0 +1,2 @@
+NAME     ENDPOINTS                         AGE
+webapp   10.244.0.3:8080,10.244.0.4:8080   38m

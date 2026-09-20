@@ -1,0 +1,155 @@
+### nodes
+NAME                 STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION                             CONTAINER-RUNTIME
+kind-control-plane   Ready    control-plane   22d   v1.37.0   172.18.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.6.87.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.4
+### svc
+NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE   SELECTOR
+kubernetes        ClusterIP   10.96.0.1      <none>        443/TCP          22d   <none>
+webapp            ClusterIP   10.96.135.12   <none>        8080/TCP         18h   app=webapp
+webapp-nodeport   NodePort    10.96.23.58    <none>        8080:31873/TCP   17h   app=webapp
+### pods
+NAME                      READY   STATUS    RESTARTS       AGE   IP           NODE                 NOMINATED NODE   READINESS GATES
+webapp-7dbcc8ff4b-qs5xh   1/1     Running   1 (5m8s ago)   17h   10.244.0.3   kind-control-plane   <none>           <none>
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   2 (5m8s ago)   43h   10.244.0.2   kind-control-plane   <none>           <none>
+### proxy
+HTTPS_PROXY=http://127.0.0.1:9674
+no_proxy=172.31.*,172.30.*,172.29.*,172.28.*,172.27.*,172.26.*,172.25.*,172.24.*,172.23.*,172.22.*,172.21.*,172.20.*,172.19.*,172.18.*,172.17.*,172.16.*,10.*,192.168.*,127.*,localhost,<local>
+NO_PROXY=172.31.*,172.30.*,172.29.*,172.28.*,172.27.*,172.26.*,172.25.*,172.24.*,172.23.*,172.22.*,172.21.*,172.20.*,172.19.*,172.18.*,172.17.*,172.16.*,10.*,192.168.*,127.*,localhost,<local>
+https_proxy=http://127.0.0.1:9674
+http_proxy=http://127.0.0.1:9674
+HTTP_PROXY=http://127.0.0.1:9674
+### curl-noproxy
+curl: (28) Connection timed out after 10002 milliseconds
+curl_exit=28
+### ip route get 172.18.0.2
+172.18.0.2 via 172.18.128.1 dev eth2 src 172.18.197.168 uid 1000 
+    cache 
+### 节点容器内部访问 localhost:31873
+HTTP/1.1 200 OK
+Date: Sun, 20 Sep 2026 01:44:58 GMT
+Content-Length: 22
+Content-Type: text/html; charset=utf-8
+
+<h1>Hello DevOps</h1>
+### 集群内部访问 172.18.0.2:31873
+error: --rm should only be used for attached containers
+See 'kubectl run -h' for help and examples
+### 集群内部访问 ClusterIP 8080
+error: --rm should only be used for attached containers
+See 'kubectl run -h' for help and examples
+### 集群内部访问 172.18.0.2:31873
+<h1>Hello DevOps</h1>
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+warning: couldn't attach to pod/tmp4, falling back to streaming logs: unable to upgrade connection: container tmp4 not found in pod tmp4_default
+<h1>Hello DevOps</h1>
+pod "tmp4" deleted from default namespace
+### 集群内部访问 ClusterIP 10.96.135.12:8080
+<h1>Hello DevOps</h1>
+All commands and output from this session will be recorded in container logs, including credentials and sensitive information passed through the command prompt.
+If you don't see a command prompt, try pressing enter.
+warning: couldn't attach to pod/tmp5, falling back to streaming logs: unable to upgrade connection: container tmp5 not found in pod tmp5_default
+<h1>Hello DevOps</h1>
+pod "tmp5" deleted from default namespace
+### 删除 webapp-nodeport
+service "webapp-nodeport" deleted from default namespace
+### 删除之后查询端点对象
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+Error from server (NotFound): endpoints "webapp-nodeport" not found
+### webapp 的选择器与端点
+{"app":"webapp"}
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME     ENDPOINTS                         AGE
+webapp   10.244.0.2:8080,10.244.0.3:8080   18h
+### pod 沙箱与创建时刻
+3e495f6c-6028-4042-ad7e-fa4405071120 2026-09-18T06:35:47Z 2026-09-18T06:35:47Z 10.244.0.2 2
+8e086c43-3826-4a5d-9ff2-e7df718022e7 2026-09-19T08:30:16Z 2026-09-19T08:30:16Z 10.244.0.3 1
+### 节点容器启动时刻
+2026-09-20T01:39:14.803046573Z
+### Last State
+    Last State:     Terminated
+      Reason:       Unknown
+      Exit Code:    255
+      Started:      Sat, 19 Sep 2026 15:31:49 +0800
+      Finished:     Sun, 20 Sep 2026 09:39:17 +0800
+    Ready:          True
+    Restart Count:  2
+### Events
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-2k7x2:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type    Reason          Age    From     Message
+  ----    ------          ----   ----     -------
+  Normal  SandboxChanged  6m11s  kubelet  Pod sandbox changed, it will be killed and re-created.
+  Normal  Pulled          6m10s  kubelet  spec.containers{webapp}: Container image "webapp:v4" already present on machine and can be accessed by the pod
+  Normal  Created         6m10s  kubelet  spec.containers{webapp}: Container created
+  Normal  Started         6m10s  kubelet  spec.containers{webapp}: Container started
+### env r8jvf
+HOSTNAME=webapp-7dbcc8ff4b-r8jvf
+WEBAPP_NODEPORT_PORT_8080_TCP_ADDR=10.96.23.58
+WEBAPP_PORT_8080_TCP=tcp://10.96.135.12:8080
+WEBAPP_PORT_8080_TCP_ADDR=10.96.135.12
+WEBAPP_NODEPORT_SERVICE_PORT=8080
+WEBAPP_SERVICE_PORT=8080
+WEBAPP_PORT_8080_TCP_PROTO=tcp
+WEBAPP_NODEPORT_SERVICE_HOST=10.96.23.58
+WEBAPP_NODEPORT_PORT_8080_TCP=tcp://10.96.23.58:8080
+WEBAPP_NODEPORT_PORT_8080_TCP_PROTO=tcp
+WEBAPP_NODEPORT_PORT_8080_TCP_PORT=8080
+WEBAPP_SERVICE_HOST=10.96.135.12
+WEBAPP_PORT=tcp://10.96.135.12:8080
+WEBAPP_NODEPORT_PORT=tcp://10.96.23.58:8080
+WEBAPP_PORT_8080_TCP_PORT=8080
+### env qs5xh
+HOSTNAME=webapp-7dbcc8ff4b-qs5xh
+WEBAPP_PORT=tcp://10.96.135.12:8080
+WEBAPP_PORT_8080_TCP_PORT=8080
+WEBAPP_NODEPORT_SERVICE_PORT=8080
+WEBAPP_PORT_8080_TCP_ADDR=10.96.135.12
+WEBAPP_NODEPORT_PORT_8080_TCP=tcp://10.96.23.58:8080
+WEBAPP_SERVICE_PORT=8080
+WEBAPP_PORT_8080_TCP=tcp://10.96.135.12:8080
+WEBAPP_PORT_8080_TCP_PROTO=tcp
+WEBAPP_NODEPORT_SERVICE_HOST=10.96.23.58
+WEBAPP_NODEPORT_PORT_8080_TCP_PROTO=tcp
+WEBAPP_SERVICE_HOST=10.96.135.12
+WEBAPP_NODEPORT_PORT=tcp://10.96.23.58:8080
+WEBAPP_NODEPORT_PORT_8080_TCP_PORT=8080
+WEBAPP_NODEPORT_PORT_8080_TCP_ADDR=10.96.23.58
+
+---
+
+## 结论（逐段对应上面的原始输出）
+
+| 段落 | 结论 |
+|---|---|
+| `### proxy` | shell 中配置了 `http_proxy=http://127.0.0.1:9674` 等四个代理变量，`no_proxy` 中包含 `172.18.*`，因此 curl 对 `172.18.0.2` 的请求按环境变量判断本应当绕过代理。 |
+| `### curl-noproxy` | 加上 `--noproxy '*'` 参数之后得到的不是 `502`，而是 `curl: (28) Connection timed out after 10002 milliseconds`，说明从 WSL 发行版到节点容器地址 `172.18.0.2` 的 31873 端口之间不存在可用的转发路径；第一次实验得到的那一条 `502` 结论作废。 |
+| `### ip route get 172.18.0.2` | 路由表中存在一条经由 `172.18.128.1` 的条目，但是数据包在超时时间内没有得到任何响应，说明问题不是本机路由缺失，而是该地址无法从 WSL 发行版直接到达。 |
+| `### 节点容器内部访问 localhost:31873` | 在节点容器内部执行 `curl http://localhost:31873/` 得到 `HTTP/1.1 200 OK` 与 `<h1>Hello DevOps</h1>`，说明 kube-proxy 确实在节点上写入了节点端口的转发规则，并且规则可以把数据包转发到后端 Pod。 |
+| `### 集群内部访问 172.18.0.2:31873` | 从一个临时 busybox Pod 访问节点地址与节点端口同样得到 `<h1>Hello DevOps</h1>`，说明节点端口在集群网络内部可以正常使用。 |
+| `### 集群内部访问 ClusterIP 10.96.135.12:8080` | 通过 ClusterIP 访问同样成功，说明 ClusterIP 与 NodePort 两条路径都工作正常。 |
+| `### 删除 webapp-nodeport` | 输出为 `service "webapp-nodeport" deleted from default namespace`，删除操作成功。 |
+| `### 删除之后查询端点对象` | 输出为 `Error from server (NotFound): endpoints "webapp-nodeport" not found`，说明删除 Service 之后，与它同名的 Endpoints 对象也被删除，笔记 3.4 节阶段六第 24 行的预测成立。 |
+| `### webapp 的选择器与端点` | 选择器的取值是 `{"app":"webapp"}`，说明第 8 项任务中修改过的选择器已经改回原值；端点列表是 `10.244.0.2:8080,10.244.0.3:8080`，与当前两个处于就绪状态的 Pod 一致。 |
+| `### pod 沙箱与创建时刻` | `r8jvf` 的 uid 是 `3e495f6c…`、创建时刻是 `2026-09-18T06:35:47Z`、重启计数是 2；`qs5xh` 的 uid 是 `8e086c43…`、创建时刻是 `2026-09-19T08:30:16Z`、重启计数是 1。两个 Pod 的 `status.startTime` 与创建时刻取值相同，说明它只在 Pod 开始被 kubelet 接管时写入一次，沙箱重建不会更新它，因此不能用它判断沙箱是否被重建。 |
+| `### 节点容器启动时刻` | 取值是 `2026-09-20T01:39:14Z`，也就是北京时间 09:39，说明节点容器在本次实验开始之前被重新启动过。 |
+| `### Last State` | 上一个容器终止的原因是 `Unknown`，退出码是 `255`，开始时间是 9 月 19 日 15:31，结束时间是 9 月 20 日 09:39，与节点容器的启动时刻吻合，说明容器是在容器运行时停止时被终止的。 |
+| `### Events` | 事件中出现 `SandboxChanged`，原文是 `Pod sandbox changed, it will be killed and re-created.`，这是判断沙箱被重建的权威依据；随后是 `Pulled`、`Created`、`Started` 三条记录。 |
+| 容器环境变量 | 两个 Pod 的环境变量中都包含 `WEBAPP_*` 与 `WEBAPP_NODEPORT_*` 两组变量。`r8jvf` 的 Pod 对象创建于 Service 创建之前，却仍然拥有这两组变量，原因是它的容器在 Service 创建之后被重建过，说明 kubelet 是在创建容器时计算并注入这些变量，因此准确的要求是 Service 必须先于容器的创建存在。 |
+| 环境变量的时效性 | `WEBAPP_NODEPORT_*` 这一组变量在当前时刻仍然存在，而 `webapp-nodeport` 这个 Service 在三分钟之前已经被删除，说明环境变量是容器创建时刻的快照，创建之后不会再更新。 |

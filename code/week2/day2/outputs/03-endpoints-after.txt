@@ -1,0 +1,21 @@
+# 10.244.0.3:8080 被删除了, 新的pod是10.244.0.9, 对应endpoint是 10.244.0.9:8080
+NAME     ENDPOINTS                         AGE
+webapp   10.244.0.4:8080,10.244.0.9:8080   49m
+
+# ❯ kc describe svc webapp
+Name:                     webapp
+Namespace:                default
+Labels:                   app=webapp
+Annotations:              <none>
+Selector:                 app=webapp
+Type:                     ClusterIP
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.96.135.12
+IPs:                      10.96.135.12
+Port:                     <unset>  8080/TCP
+TargetPort:               8080/TCP
+Endpoints:                10.244.0.4:8080,10.244.0.9:8080
+Session Affinity:         None
+Internal Traffic Policy:  Cluster
+Events:                   <none>

@@ -1,0 +1,12 @@
+# kc get svc -o wide > outputs/02-svc-clusterip.txt
+NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP    22d   <none>
+webapp       ClusterIP   10.96.135.12   <none>        8080/TCP   17s   app=webapp
+
+
+
+# kubectl get endpoints webapp >> outputs/02-svc-clusterip.txt
+# 比对 00-baseline-pods 可知确实是这两个 pod
+!!! 有警告: Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME     ENDPOINTS                         AGE
+webapp   10.244.0.3:8080,10.244.0.4:8080   64s

@@ -1,0 +1,25 @@
+# ClusterIP 类型 Service 的填空骨架：把每一处尖括号替换成正确的取值，然后另存为 svc-clusterip.yaml。
+#
+# 填写之前请依次确认下面四件事：
+# 1. 填写完成之后，文件里不允许再出现尖括号。名称字段与标签取值只允许包含字母、数字、短横线与点号，
+#    并且必须以字母或数字开头和结尾，否则 API Server 会拒绝创建（该现象对应第 2 周错题本中的 K1）。
+# 2. 不要写入 status 段落。status 属于服务端字段，由 Kubernetes 写入并持续更新；
+#    同样不要写入 spec.clusterIP 字段，这个取值由 API Server 从集群的服务地址段中分配之后写入（该结论对应错题本中的 K3）。
+# 3. spec.selector 的取值必须与 code/week2/day1/deploy.webapp.yaml 中 Pod 模板的标签匹配。
+#    如果选择器写成不匹配任何 Pod 的取值，Service 对象本身不会报错，也不会产生事件，只有 Endpoints 对象会变为空。
+# 4. spec.ports 中 port 与 targetPort 是两个不同的字段：port 是客户端访问 Service 时使用的端口，
+#    targetPort 是数据包被转发到 Pod 之后使用的端口。两个字段的取值允许不同，本次实验让它们取相同的数值。
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp              # Service 的名称，同时决定 DNS 名称的第一段，即 <名称>.<命名空间>.svc.cluster.local
+  labels:
+    app: webapp             # 这个标签用于标记 Service 对象本身，与 spec.selector 的作用不同，不要混淆
+spec:
+  type: ClusterIP       # 三种取值分别是 ClusterIP、NodePort、LoadBalancer；省略整个字段等价于 ClusterIP
+  selector:             # 标签选择器，取值是一个键值映射，不是列表
+    app: webapp             # 取值必须与 Pod 模板的同名标签一致
+  ports:
+    - port: 8080          # 客户端访问 Service 时使用的端口
+      targetPort: 8080    # 数据包被转发到 Pod 之后使用的端口，取值可以与上面的 port 不同
+      protocol: TCP     # 协议字段，默认值为 TCP，本次可以省略

@@ -1,0 +1,43 @@
+# kubectl get svc > outputs/04-nodeport.txt
+# 这里自动分配的端口是31873
+NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)          AGE
+kubernetes        ClusterIP   10.96.0.1      <none>        443/TCP          22d
+webapp            ClusterIP   10.96.135.12   <none>        8080/TCP         59m
+webapp-nodeport   NodePort    10.96.23.58    <none>        8080:31873/TCP   6s
+
+# docker 宿主机 curl 无法通, 报502
+❯ curl -I 172.18.0.2:8080
+HTTP/1.1 502 Bad Gateway
+Connection: keep-alive
+Keep-Alive: timeout=4
+Proxy-Connection: keep-alive
+Content-Length: 0
+
+❯ curl -I 172.18.0.2:31873
+HTTP/1.1 502 Bad Gateway
+Connection: keep-alive
+Keep-Alive: timeout=4
+Proxy-Connection: keep-alive
+Content-Length: 0
+
+# 用docker inspect 查 control-plan 网络端口信息 从后面的实验能看出来6443是control-plane的暴露端口
+❯ docker inspect kind-control-plane --format '{{json .NetworkSettings.Ports}}'
+{"6443/tcp":[{"HostIp":"127.0.0.1","HostPort":"42691"}]}
+
+❯ curl -I 127.0.0.1:6443
+HTTP/1.1 502 Bad Gateway
+Connection: keep-alive
+Keep-Alive: timeout=4
+Proxy-Connection: keep-alive
+Content-Length: 0
+
+❯ curl -I 127.0.0.1:42691
+HTTP/1.0 400 Bad Request
+Connection: keep-alive
+Keep-Alive: timeout=4
+Proxy-Connection: keep-aliveHTTPS_PROXY=http://127.0.0.1:9674
+no_proxy=172.31.*,172.30.*,172.29.*,172.28.*,172.27.*,172.26.*,172.25.*,172.24.*,172.23.*,172.22.*,172.21.*,172.20.*,172.19.*,172.18.*,172.17.*,172.16.*,10.*,192.168.*,127.*,localhost,<local>
+NO_PROXY=172.31.*,172.30.*,172.29.*,172.28.*,172.27.*,172.26.*,172.25.*,172.24.*,172.23.*,172.22.*,172.21.*,172.20.*,172.19.*,172.18.*,172.17.*,172.16.*,10.*,192.168.*,127.*,localhost,<local>
+https_proxy=http://127.0.0.1:9674
+http_proxy=http://127.0.0.1:9674
+HTTP_PROXY=http://127.0.0.1:9674

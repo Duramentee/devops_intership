@@ -1,0 +1,12 @@
+# 命令：kubectl port-forward po/webapp-7dbcc8ff4b-qs5xh 8888:8080（在另一个终端执行）
+# 命令：curl --noproxy "*" -i http://127.0.0.1:8888/
+HTTP/1.1 200 OK
+Date: Sun, 20 Sep 2026 01:48:07 GMT
+Content-Length: 22
+Content-Type: text/html; charset=utf-8
+
+<h1>Hello DevOps</h1>
+curl_exit=0
+--- 另外确认：转发目标 Pod 的 IP 与 Service 无关 ---
+NAME                      READY   STATUS    RESTARTS        AGE   IP           NODE                 NOMINATED NODE   READINESS GATES
+webapp-7dbcc8ff4b-qs5xh   1/1     Running   1 (8m51s ago)   17h   10.244.0.3   kind-control-plane   <none>           <none>

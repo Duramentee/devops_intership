@@ -1,0 +1,4 @@
+# kc get endpointslices -o wide >> outputs/02-endpointslice.txt
+NAME           ADDRESSTYPE   PORTS   ENDPOINTS               AGE
+kubernetes     IPv4          6443    172.18.0.2              22d
+webapp-jjm4b   IPv4          8080    10.244.0.4,10.244.0.3   6m21s

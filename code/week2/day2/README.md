@@ -70,3 +70,16 @@
 | 临时 Pod 的状态为 `ImagePullBackOff` | 节点内部的容器运行时镜像库中没有 `busybox:1.36`，并且节点从公网拉取失败 | 先在宿主机执行 `docker pull busybox:1.36`，再执行 `kind load docker-image busybox:1.36` |
 | 在宿主机执行 `curl localhost:<节点端口>` 失败 | kind 的节点本身是一个 Docker 容器，节点端口只暴露在节点容器的网络命名空间内；如果创建集群时没有通过 `extraPortMappings` 声明端口映射，宿主机上就没有对应的转发规则 | 执行 `kubectl get nodes -o wide` 取得节点地址，把访问地址改为 `<节点地址>:<节点端口>` |
 | 访问服务名称时提示名称无法解析 | 临时 Pod 的 DNS 配置不正确，或者 CoreDNS 没有正常运行 | 执行 `kubectl get po -n kube-system` 确认 CoreDNS 的 Pod 处于就绪状态；也可以改用 `<服务名>.<命名空间>.svc.cluster.local` 这个完整域名访问 |
+
+## 六、验收结果（2026-09-20 完成）
+
+| 编号 | 标准 | 结果 |
+|---|---|---|
+| 1 | ClusterIP 类型的 Service 创建成功，端点列表包含全部处于就绪状态的 Pod 地址 | ✅ 端点列表为 `10.244.0.2:8080,10.244.0.3:8080`，与两个处于就绪状态的 Pod 一致 |
+| 2 | 在集群内部使用临时 Pod 访问服务名称，能够得到应用返回的内容 | ✅ 两次返回 `<h1>Hello DevOps</h1>` |
+| 3 | 删除一个 Pod 之后端点中的地址被替换，而 ClusterIP 没有变化 | ✅ `10.244.0.3:8080` 被替换为 `10.244.0.9:8080`，ClusterIP 保持 `10.96.135.12` |
+| 4 | 选择器改成不匹配任何 Pod 之后端点变为空，并能够说明客户端访问失败的原因 | ✅ 端点为 `<none>`，客户端得到 `Connection refused`，原因是 kube-proxy 为没有后端的 Service 写入了拒绝规则，而不是把数据包静默丢弃 |
+| 5 | NodePort 类型的 Service 创建成功，并能够说明从宿主机访问时不能使用 `localhost` 的原因 | ✅ 节点端口 `31873` 由 API Server 自动分配；节点容器只发布了 API Server 的端口，因此 `localhost` 与节点地址都无法从宿主机访问，验证改用节点容器内部与集群内部两种方式完成 |
+| 6 | 能够按照「客户端 → Service → Endpoints → Pod」的顺序说明链路上每一步由哪个组件负责 | ✅ 见 `notes/week2/day2.md` 第三节的 3.4 与 3.8 两个小节 |
+
+> 原始输出统一保存在 `outputs/` 目录；补做实验的完整记录在 `outputs/07-fix-and-verify.txt`。

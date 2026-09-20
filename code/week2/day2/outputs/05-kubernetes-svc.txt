@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: "2026-08-28T05:53:28Z"
+  labels:
+    component: apiserver
+    provider: kubernetes
+  name: kubernetes
+  namespace: default
+  resourceVersion: "215"
+  uid: 566ad3d5-7a4f-4efc-b2f2-6f50c869f6af
+spec:
+  clusterIP: 10.96.0.1
+  clusterIPs:
+  - 10.96.0.1
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 6443
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}
+
+❯ kubectl get endpoints kubernetes
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME         ENDPOINTS         AGE
+kubernetes   172.18.0.2:6443   22d
