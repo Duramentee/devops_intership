@@ -1,0 +1,7 @@
+NAME                      READY   STATUS        RESTARTS      AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-7f78498c55-kst78   1/1     Running       0             12s     10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-lt8fj   1/1     Running       0             6s      10.244.0.17   kind-control-plane   <none>           <none>
+webapp-7f9d7cc67-2jd2g    1/1     Terminating   1 (38s ago)   5m28s   10.244.0.14   kind-control-plane   <none>           <none>
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME     ENDPOINTS                           AGE
+webapp   10.244.0.16:8080,10.244.0.17:8080   2d1h

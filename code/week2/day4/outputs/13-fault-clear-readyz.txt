@@ -1,0 +1,10 @@
+修改已完成。当前状态：
+healthz_fault=false
+readyz_fault=false
+NAME                      READY   STATUS    RESTARTS   AGE
+webapp-7f78498c55-kst78   0/1     Running   0          71s
+webapp-7f78498c55-lt8fj   1/1     Running   0          65s
+webapp-7f78498c55-kst78   1/1     Running   0          71s
+NAME                      READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-7f78498c55-kst78   1/1     Running   0          91s   10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-lt8fj   1/1     Running   0          85s   10.244.0.17   kind-control-plane   <none>           <none>

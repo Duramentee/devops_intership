@@ -1,0 +1,15 @@
+NAME                DESIRED   CURRENT   READY   AGE    CONTAINERS   IMAGES      SELECTOR
+webapp-654bfc4f58   0         0         0       101m   webapp       webapp:v5   app=webapp,pod-template-hash=654bfc4f58
+webapp-77c846c8d8   0         0         0       24h    webapp       webapp:v5   app=webapp,pod-template-hash=77c846c8d8
+webapp-7944f66797   0         0         0       24h    webapp       webapp:v5   app=webapp,pod-template-hash=7944f66797
+webapp-7dbcc8ff4b   0         0         0       3d2h   webapp       webapp:v4   app=webapp,pod-template-hash=7dbcc8ff4b
+webapp-855d94f5b8   0         0         0       24h    webapp       webapp:v5   app=webapp,pod-template-hash=855d94f5b8
+webapp-fd874688f    2         2         2       66m    webapp       webapp:v6   app=webapp,pod-template-hash=fd874688f
+NAME                DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES      SELECTOR
+webapp-654bfc4f58   0         0         0       119m    webapp       webapp:v5   app=webapp,pod-template-hash=654bfc4f58
+webapp-77c846c8d8   0         0         0       24h     webapp       webapp:v5   app=webapp,pod-template-hash=77c846c8d8
+webapp-7944f66797   0         0         0       24h     webapp       webapp:v5   app=webapp,pod-template-hash=7944f66797
+webapp-7dbcc8ff4b   0         0         0       3d2h    webapp       webapp:v4   app=webapp,pod-template-hash=7dbcc8ff4b
+webapp-7f9d7cc67    2         2         2       4m21s   webapp       webapp:v6   app=webapp,pod-template-hash=7f9d7cc67
+webapp-855d94f5b8   0         0         0       24h     webapp       webapp:v5   app=webapp,pod-template-hash=855d94f5b8
+webapp-fd874688f    0         0         0       85m     webapp       webapp:v6   app=webapp,pod-template-hash=fd874688f

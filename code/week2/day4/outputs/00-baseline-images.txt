@@ -1,0 +1,7 @@
+IMAGE       ID             DISK USAGE   CONTENT SIZE   EXTRA
+webapp:v1   e53f3daa9e28        449MB         88.9MB        
+webapp:v2   98e726684c10       25.3MB          8.3MB        
+webapp:v3   5ce784714b3e       12.6MB         4.51MB        
+webapp:v4   ab9bd866968e       25.3MB          8.3MB        
+webapp:v5   e0f7f2e3383b       25.4MB          8.3MB        
+webapp:v6   abe80821e008       25.4MB         8.32MB        

@@ -1,0 +1,6 @@
+修改已完成。当前状态：
+healthz_fault=true
+readyz_fault=false
+修改已完成。当前状态：
+healthz_fault=true
+readyz_fault=false

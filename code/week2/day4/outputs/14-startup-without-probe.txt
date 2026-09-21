@@ -1,0 +1,13 @@
+deployment.apps/webapp configured
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+error: timed out waiting for the condition
+NAME                      READY   STATUS    RESTARTS      AGE
+webapp-5bd67f6c57-rbdz2   0/1     Running   5 (15s ago)   2m1s
+webapp-7f78498c55-kst78   1/1     Running   0             3m45s
+webapp-7f78498c55-lt8fj   1/1     Running   0             3m39s
+webapp-5bd67f6c57-rbdz2   0/1     CrashLoopBackOff   5 (0s ago)    2m1s
+webapp-5bd67f6c57-rbdz2   0/1     Running            6 (81s ago)   3m22s
+NAME                      READY   STATUS    RESTARTS      AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-5bd67f6c57-rbdz2   0/1     Running   6 (90s ago)   3m31s   10.244.0.18   kind-control-plane   <none>           <none>
+webapp-7f78498c55-kst78   1/1     Running   0             5m15s   10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-lt8fj   1/1     Running   0             5m9s    10.244.0.17   kind-control-plane   <none>           <none>

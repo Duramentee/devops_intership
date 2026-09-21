@@ -1,0 +1,6 @@
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME     ENDPOINTS          AGE
+webapp   10.244.0.17:8080   2d1h
+NAME           ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
+kubernetes     IPv4          6443    172.18.0.2                24d
+webapp-jjm4b   IPv4          8080    10.244.0.16,10.244.0.17   2d1h

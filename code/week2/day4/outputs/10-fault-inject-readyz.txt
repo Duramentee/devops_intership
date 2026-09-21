@@ -1,0 +1,4 @@
+目标 Pod：webapp-7f78498c55-kst78
+修改已完成。当前状态：
+healthz_fault=false
+readyz_fault=true

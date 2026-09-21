@@ -1,0 +1,90 @@
+# Deployment 骨架（三种探针并存，用来演示启动探针）：把每一处尖括号替换成正确的取值，
+# 然后另存为 deploy.startup.yaml。
+#
+# 这一份清单对应的是补充实验，教材写作的年代还没有启动探针这个字段（书本只讲到 p.155-161 的存活探针
+# 与 p.247-253 的就绪探针），因此本节内容全部是我的补充，不是书本原文。
+#
+# 填写之前请依次确认下面八件事：
+#
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+#
+# 2. 这份清单仍然是就地更新 Deployment webapp，它与上一步的清单相比有两处差异：
+#    第一处是新增了 startupProbe 段落，第二处是在容器里新增了环境变量 SLOW_START_SECONDS。
+#    两处改动都是为了把「应用启动很慢」这个场景造出来。
+#
+# 3. SLOW_START_SECONDS 的取值填 40。它的含义是：进程启动之后的 40 秒之内，
+#    /healthz 与 /readyz 两个端点都会返回状态码 503。这两个端点在时间窗之外返回 200。
+#    把这个值取得比存活探针能够容忍的时间更长，才能让「没有启动探针时会怎样」这件事暴露出来。
+#
+# 4. startupProbe 的 periodSeconds 填 5、failureThreshold 填 12，两者相乘等于 60 秒，
+#    也就是启动探针最多允许应用启动 60 秒。40 秒的慢启动窗口落在这个范围之内，因此启动探针最终会成功。
+#    需要记住的机制是：startupProbe 成功之前，livenessProbe 与 readinessProbe 都不会被执行。
+#
+# 5. 对照组是这样构造的：把下面整个 startupProbe 段落注释掉，其余字段保持不动，再执行一次 kubectl apply。
+#    此时容器创建 5 秒之后存活探针开始探测，每 5 秒探测一次，连续失败三次即大约 15 秒之后容器被重启；
+#    重启之后进程从零开始计时，于是重新进入慢启动窗口，容器陷入反复重启的循环。
+#    这个循环直接体现了「固定延迟的 initialDelaySeconds 无法表达波动的启动耗时」这一缺陷。
+#
+# 6. 观察重启循环时，kubectl get po 输出中的 RESTARTS 一列会持续增长，STATUS 一列会在 Running 与
+#    CrashLoopBackOff 之间切换，而容器的退出码在日志与 kubectl describe 中显示为 137。
+#    教材 p.158 与 p.160 解释了这个数字：137 等于 128 加 9，9 是 SIGKILL 的信号编号，
+#    表示进程被外部信号强制终止，也就是被 kubelet 杀掉。
+#
+# 7. 观察启动探针生效时，kubectl get po 输出中的 RESTARTS 一列始终保持为 0，
+#    而 READY 一列会在 45 秒左右从 0/1 变成 1/1；此时容器内部 /state 端点返回的 uptime_seconds 也是连续增长的。
+#
+# 8. 三种探针同时存在时，kubectl describe po 输出的探针信息段落会依次列出 Liveness、Readiness、Startup 三段，
+#    每一段都会打印各自的 delay、timeout、period 与 failure 取值，可以直接与清单里的字段逐一对照。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: <期望的副本数量，填写 2>
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: <镜像名称与标签，填写 webapp:v6>
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          env:
+            - name: SLOW_START_SECONDS   # 模拟慢启动：进程启动之后的这段时间内两个探针端点都返回 503
+              value: <填写 "40"。注意这个位置是字符串字段，写数字时建议加引号以避免被解析成其他类型>
+          startupProbe:                  # 启动探针：它成功之前，下面两个探针都不会被执行
+            httpGet:
+              path: <填写 /healthz>
+              port: <填写 8080>
+            periodSeconds: <每隔多少秒探测一次，填写 5>
+            failureThreshold: <最多允许失败多少次，填写 12，与上面的周期相乘等于 60 秒>
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: <填写 /healthz>
+              port: <填写 8080>
+            initialDelaySeconds: <填写 5>
+            periodSeconds: <填写 5>
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: <填写 /readyz>
+              port: <填写 8080>
+            initialDelaySeconds: <填写 2>
+            periodSeconds: <填写 5>
+            timeoutSeconds: 1
+            failureThreshold: 3

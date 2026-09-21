@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "7"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"webapp"},"name":"webapp","namespace":"default"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"webapp"}},"template":{"metadata":{"labels":{"app":"webapp","env":"dev"}},"spec":{"containers":[{"envFrom":[{"configMapRef":{"name":"webapp-config"}},{"secretRef":{"name":"webapp-secret"}}],"image":"webapp:v6","livenessProbe":{"failureThreshold":3,"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":5,"periodSeconds":5,"timeoutSeconds":1},"name":"webapp","ports":[{"containerPort":8080}]}]}}}}
+  creationTimestamp: "2026-09-18T06:35:46Z"
+  generation: 9
+  labels:
+    app: webapp
+  name: webapp
+  namespace: default
+  resourceVersion: "417622"
+  uid: 7b58d36b-ebc3-4165-96a2-03e0dcd13bcd
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: webapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-09-21T14:54:37+08:00"
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-secret
+        image: webapp:v6
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: webapp
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 2
+  conditions:
+  - lastTransitionTime: "2026-09-19T08:30:17Z"
+    lastUpdateTime: "2026-09-19T08:30:17Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-18T06:35:47Z"
+    lastUpdateTime: "2026-09-21T08:49:53Z"
+    message: ReplicaSet "webapp-7f9d7cc67" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 9
+  readyReplicas: 2
+  replicas: 2
+  terminatingReplicas: 0
+  updatedReplicas: 2

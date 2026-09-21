@@ -1,0 +1,2 @@
+NAME     ENDPOINTS                           AGE
+webapp   10.244.0.12:8080,10.244.0.13:8080   2d

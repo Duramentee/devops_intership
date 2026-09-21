@@ -1,0 +1,74 @@
+# Deployment 骨架（同时加存活探针与就绪探针）：把每一处尖括号替换成正确的取值，
+# 然后另存为 deploy.readiness.yaml。
+#
+# 填写之前请依次确认下面七件事：
+#
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+#
+# 2. 这份清单同样是就地更新 Deployment webapp，因此 metadata.name 保持不变。
+#    它在上一步的清单基础上只增加了一个 readinessProbe 段落，其他字段全部保持一致，
+#    这样两次 apply 之间的差异只有一处，观察到的行为变化才能归因到「新增了就绪探针」这一件事上。
+#
+# 3. 两种探针指向不同的路径，这是本次实验能够把两类现象分开观察的前提：
+#    livenessProbe 指向 /healthz，readinessProbe 指向 /readyz。
+#    故障注入开关可以只改变其中一个路径的返回值，因此能够单独观察「只影响重启的失败」
+#    与「只影响流量的失败」这两种后果。
+#
+# 4. readinessProbe.initialDelaySeconds 填 2 秒，比存活探针的 5 秒更短。
+#    这样安排的原因是：就绪探针只影响流量，不影响容器的存活，
+#    因此让它在容器启动之后尽快开始探测是合理的做法，应用一旦准备完成就能尽快接收流量。
+#
+# 5. readinessProbe 与 livenessProbe 的 port 都是容器内部的 8080，两个探针各自独立计时，
+#    互不影响：其中一个探针失败不会让另一个探针停止执行。
+#
+# 6. 本次的副本数量填 2。副本数量为 2 的作用是：当只对一个 Pod 注入就绪故障时，
+#    端点列表里应当只剩另一个 Pod 的地址，因此「移除」这件事在端点列表上是可见的；
+#    如果副本数量为 1，端点列表会变成空列表，输出里的对照信息会少一组。
+#
+# 7. 要在容器内部调用故障注入端点，可以直接使用镜像里自带的 busybox wget：
+#    执行 kubectl exec 加上该 Pod 的名称，后面再接一段 -- wget -q -O- 与下面的地址：
+#    "http://localhost:8080/admin/fault?target=readyz&state=down"
+#    命令在容器内部访问 localhost，因此不需要经过 Service，也不需要端口转发。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:v6
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          livenessProbe:             # 存活探针：失败时 kubelet 重启容器
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:            # 就绪探针：失败时 kubelet 把 Pod 从端点列表中移除
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3

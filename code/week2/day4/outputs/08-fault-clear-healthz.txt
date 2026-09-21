@@ -1,0 +1,6 @@
+目标 Pod：webapp-7f9d7cc67-2jd2g
+uptime_seconds=25
+slow_start_seconds=0
+in_slow_start=false
+healthz_fault=false
+readyz_fault=false

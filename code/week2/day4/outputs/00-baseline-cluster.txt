@@ -1,0 +1,5 @@
+CONTAINER ID   IMAGE                  COMMAND                  CREATED       STATUS       PORTS                       NAMES
+03c79c82925b   kindest/node:v1.37.0   "/usr/local/bin/entr…"   3 weeks ago   Up 7 hours   127.0.0.1:42691->6443/tcp   kind-control-plane
+
+NAME                 STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION                             CONTAINER-RUNTIME
+kind-control-plane   Ready    control-plane   24d   v1.37.0   172.18.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.6.87.2-microsoft-standard-WSL2 (amd64)   containerd://2.3.4

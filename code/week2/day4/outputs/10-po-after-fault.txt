@@ -1,0 +1,7 @@
+NAME                      READY   STATUS    RESTARTS   AGE
+webapp-7f78498c55-kst78   1/1     Running   0          21s
+webapp-7f78498c55-lt8fj   1/1     Running   0          15s
+webapp-7f78498c55-kst78   0/1     Running   0          36s
+NAME                      READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-7f78498c55-kst78   0/1     Running   0          51s   10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-lt8fj   1/1     Running   0          45s   10.244.0.17   kind-control-plane   <none>           <none>

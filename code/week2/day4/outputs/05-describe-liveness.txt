@@ -1,0 +1,132 @@
+Name:             webapp-fd874688f-qs4ln
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             kind-control-plane/172.18.0.2
+Start Time:       Mon, 21 Sep 2026 15:29:07 +0800
+Labels:           app=webapp
+                  env=dev
+                  pod-template-hash=fd874688f
+Annotations:      kubectl.kubernetes.io/restartedAt: 2026-09-21T14:54:37+08:00
+Status:           Running
+IP:               10.244.0.12
+IPs:
+  IP:           10.244.0.12
+Controlled By:  ReplicaSet/webapp-fd874688f
+Containers:
+  webapp:
+    Container ID:   containerd://16471ca5cbaae800b599f40e3f047cde07e003d061d7d1e5c7048382f805b2c3
+    Image:          webapp:v6
+    Image ID:       docker.io/library/import-2026-09-21@sha256:6de39aa190c072e4f3de172532c23761b7e335587a6508a52b70c5d0f5c09aa0
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Mon, 21 Sep 2026 16:34:48 +0800
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    2
+      Started:      Mon, 21 Sep 2026 16:33:08 +0800
+      Finished:     Mon, 21 Sep 2026 16:34:47 +0800
+    Ready:          True
+    Restart Count:  2
+    Liveness:       http-get http://:8080/healthz delay=5s timeout=1s period=10s #success=1 #failure=3
+    Environment Variables from:
+      webapp-config  ConfigMap  Optional: false
+      webapp-secret  Secret     Optional: false
+    Environment:     <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-rkxrq (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-rkxrq:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                    From     Message
+  ----     ------     ----                   ----     -------
+  Normal   Pulled     6m42s (x3 over 72m)    kubelet  spec.containers{webapp}: Container image "webapp:v6" already present on machine and can be accessed by the pod
+  Normal   Created    6m42s (x3 over 72m)    kubelet  spec.containers{webapp}: Container created
+  Warning  Unhealthy  6m42s (x6 over 8m42s)  kubelet  spec.containers{webapp}: Liveness probe failed: HTTP probe failed with statuscode: 500
+  Normal   Killing    6m42s (x2 over 8m22s)  kubelet  spec.containers{webapp}: Container webapp failed liveness probe, will be restarted
+  Normal   Started    6m41s (x3 over 72m)    kubelet  spec.containers{webapp}: Container started
+
+
+
+Name:             webapp-7f9d7cc67-2jd2g
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             kind-control-plane/172.18.0.2
+Start Time:       Mon, 21 Sep 2026 16:49:51 +0800
+Labels:           app=webapp
+                  env=dev
+                  pod-template-hash=7f9d7cc67
+Annotations:      kubectl.kubernetes.io/restartedAt: 2026-09-21T14:54:37+08:00
+Status:           Running
+IP:               10.244.0.14
+IPs:
+  IP:           10.244.0.14
+Controlled By:  ReplicaSet/webapp-7f9d7cc67
+Containers:
+  webapp:
+    Container ID:   containerd://53273ab263e4415d1c1a756fee32de9eca9419f76044ec5ad87b9a5a00668664
+    Image:          webapp:v6
+    Image ID:       docker.io/library/import-2026-09-21@sha256:30db3983d3bade598b56f69d75a20ad689e764b059bd845f142a36787a28a00b
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Mon, 21 Sep 2026 16:54:41 +0800
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    2
+      Started:      Mon, 21 Sep 2026 16:49:52 +0800
+      Finished:     Mon, 21 Sep 2026 16:54:41 +0800
+    Ready:          True
+    Restart Count:  1
+    Liveness:       http-get http://:8080/healthz delay=5s timeout=1s period=5s #success=1 #failure=3
+    Environment Variables from:
+      webapp-config  ConfigMap  Optional: false
+      webapp-secret  Secret     Optional: false
+    Environment:     <none>
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-9jxkk (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-9jxkk:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                  From               Message
+  ----     ------     ----                 ----               -------
+  Normal   Scheduled  5m                   default-scheduler  Successfully assigned default/webapp-7f9d7cc67-2jd2g to kind-control-plane
+  Normal   Pulled     10s (x2 over 4m59s)  kubelet            spec.containers{webapp}: Container image "webapp:v6" already present on machine and can be accessed by the pod
+  Normal   Created    10s (x2 over 4m59s)  kubelet            spec.containers{webapp}: Container created
+  Normal   Started    10s (x2 over 4m59s)  kubelet            spec.containers{webapp}: Container started
+  Warning  Unhealthy  10s (x3 over 20s)    kubelet            spec.containers{webapp}: Liveness probe failed: HTTP probe failed with statuscode: 500
+  Normal   Killing    10s                  kubelet            spec.containers{webapp}: Container webapp failed liveness probe, will be restarted

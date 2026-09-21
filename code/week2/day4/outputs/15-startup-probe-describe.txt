@@ -1,0 +1,62 @@
+Name:             webapp-f9856cb66-kdhqt
+Namespace:        default
+Priority:         0
+Service Account:  default
+Node:             kind-control-plane/172.18.0.2
+Start Time:       Mon, 21 Sep 2026 17:44:20 +0800
+Labels:           app=webapp
+                  env=dev
+                  pod-template-hash=f9856cb66
+Annotations:      kubectl.kubernetes.io/restartedAt: 2026-09-21T14:54:37+08:00
+Status:           Running
+IP:               10.244.0.20
+IPs:
+  IP:           10.244.0.20
+Controlled By:  ReplicaSet/webapp-f9856cb66
+Containers:
+  webapp:
+    Container ID:   containerd://1895f30845ab1fa3c0ac4b5ec3e190d99730a7ff9a5fd20ad4eacce988058efa
+    Image:          webapp:v6
+    Image ID:       docker.io/library/import-2026-09-21@sha256:30db3983d3bade598b56f69d75a20ad689e764b059bd845f142a36787a28a00b
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Running
+      Started:      Mon, 21 Sep 2026 17:44:21 +0800
+    Ready:          True
+    Restart Count:  0
+    Liveness:       http-get http://:8080/healthz delay=5s timeout=1s period=5s #success=1 #failure=3
+    Readiness:      http-get http://:8080/readyz delay=2s timeout=1s period=5s #success=1 #failure=3
+    Startup:        http-get http://:8080/healthz delay=0s timeout=1s period=5s #success=1 #failure=12
+    Environment Variables from:
+      webapp-config  ConfigMap  Optional: false
+      webapp-secret  Secret     Optional: false
+    Environment:
+      SLOW_START_SECONDS:  40
+    Mounts:
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-t55pl (ro)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True 
+  Initialized                 True 
+  Ready                       True 
+  ContainersReady             True 
+  PodScheduled                True 
+Volumes:
+  kube-api-access-t55pl:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age                From               Message
+  ----     ------     ----               ----               -------
+  Normal   Scheduled  92s                default-scheduler  Successfully assigned default/webapp-f9856cb66-kdhqt to kind-control-plane
+  Normal   Pulled     91s                kubelet            spec.containers{webapp}: Container image "webapp:v6" already present on machine and can be accessed by the pod
+  Normal   Created    91s                kubelet            spec.containers{webapp}: Container created
+  Normal   Started    91s                kubelet            spec.containers{webapp}: Container started
+  Warning  Unhealthy  52s (x8 over 87s)  kubelet            spec.containers{webapp}: Startup probe failed: HTTP probe failed with statuscode: 503

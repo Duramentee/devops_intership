@@ -1,0 +1,59 @@
+# Deployment 清单（启动探针的对照组）：本文件是 deploy.startup.yaml 的副本，
+# 它删除了整个 startupProbe 段落，其余字段与 deploy.startup.yaml 完全一致。
+#
+# 这个对照组用来回答一个问题：当应用启动耗时较长、而存活探针只依赖固定的 initialDelaySeconds 时会发生什么。
+# 本次用环境变量 SLOW_START_SECONDS=40 把「启动阶段」拉长到 40 秒，在这 40 秒之内，
+# /healthz 与 /readyz 两个端点都返回状态码 503。
+#
+# 在缺少启动探针的情况下，存活探针在容器被创建 5 秒之后就开始探测，每 5 秒探测一次，连续失败三次，
+# 也就是大约 15 秒之后就判定为失败并重启容器。而应用需要 40 秒才能启动完成，永远赶不上这个判定，
+# 因此容器会陷入「启动未完成就被重启」的循环，重启计数持续增长。
+#
+# 与之对照，deploy.startup.yaml 中的 startupProbe 允许失败 12 次、每次间隔 5 秒，也就是最多容忍 60 秒，
+# 因此启动阶段不会被重启；启动探针成功之后，存活探针与就绪探针才开始执行。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:v6
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          env:
+            - name: SLOW_START_SECONDS   # 模拟慢启动：进程启动之后的这段时间内两个探针端点都返回 503
+              value: "40"
+          livenessProbe:                 # 存活探针：没有启动探针保护时，它在启动阶段就会把容器杀掉
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3

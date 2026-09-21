@@ -1,0 +1,10 @@
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE    CONTAINERS   IMAGES      SELECTOR     LABELS
+deployment.apps/webapp   2/2     2            2           3d1h   webapp       webapp:v6   app=webapp   app=webapp
+
+NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES   LABELS
+pod/webapp-fd874688f-qs4ln   1/1     Running   0          39m   10.244.0.12   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=fd874688f
+pod/webapp-fd874688f-rl4kv   1/1     Running   0          38m   10.244.0.13   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=fd874688f
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR     LABELS
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP    24d   <none>       component=apiserver,provider=kubernetes
+service/webapp       ClusterIP   10.96.135.12   <none>        8080/TCP   2d    app=webapp   app=webapp

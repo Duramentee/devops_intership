@@ -1,0 +1,69 @@
+# Deployment 骨架（只加存活探针）：把每一处尖括号替换成正确的取值，然后另存为 deploy.liveness.yaml。
+#
+# 填写之前请依次确认下面八件事：
+#
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+#
+# 2. 这份清单修改的是 Day 1 创建的那个 Deployment，因此 metadata.name 必须保持为 webapp。
+#    这样执行 kubectl apply -f deploy.liveness.yaml 之后发生的是「就地更新」，
+#    而不是新建出第二个 Deployment；如果名称写错，集群里会同时存在两个用途相同的 Deployment，
+#    后面所有关于副本数量与端点列表的观察都会失去唯一性。
+#
+# 3. selector.matchLabels 与 template.metadata.labels 必须完全相同，否则 API Server 会直接拒绝这份清单。
+#    本次实验沿用 app: webapp，原因是 Day 2 创建的 Service webapp 的选择器正是 app: webapp：
+#    只有标签一致，这些 Pod 才会进入该 Service 的端点列表，
+#    后面观察就绪探针失败时「Pod 从端点列表中被移除」这件事才成立。
+#
+# 4. 镜像标签必须改成 webapp:v6。v6 是今天重新构建的镜像，它新增了 /healthz、/readyz 与 /admin/fault 三个端点；
+#    如果这里仍然写 webapp:v5，探针请求会收到 404，而 404 不属于 2xx 或 3xx，探针同样会被判定为失败，
+#    于是观察到的重启循环就变成了「路径写错导致的重启」，与「探针机制导致的重启」无法区分。
+#
+# 5. livenessProbe.httpGet.port 必须填容器实际监听的端口 8080，path 必须填 /healthz。
+#    这个端口是容器内部监听的端口，不是 Service 暴露的端口，两者不可以混用。
+#
+# 6. initialDelaySeconds 的取值必须大于应用的启动耗时，本次应用启动很快，填 5 秒即可。
+#    这个字段的含义是「容器被创建之后等待多少秒才开始第一次探测」。
+#    教材 p.158 明确指出：如果没有设置初始延迟，探针会在启动时立即开始探测，
+#    通常会导致探测失败，在应用能够正确响应请求之前容器就会重启。
+#
+# 7. 本次实验为了缩短观察时间，把 periodSeconds 从默认值 10 秒改成 5 秒。
+#    在默认值之下，探针每 10 秒探测一次，连续失败三次才重启容器，也就是从第一次失败到重启大约要 30 秒；
+#    改成 5 秒之后这个过程缩短到大约 15 秒。timeoutSeconds 与 failureThreshold 保持默认值不变。
+#
+# 8. 故障注入不通过环境变量完成，而是通过应用提供的 /admin/fault 端点完成，
+#    因此这份清单的 env 段落里只保留 Day 3 那两份注入配置的引用，不需要额外的开关变量。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: <期望的副本数量，填写 2>
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: <镜像名称与标签，填写 webapp:v6>
+          ports:
+            - containerPort: 8080
+          envFrom:                  # 与 Day 3 相同：继续从 ConfigMap 与 Secret 注入配置
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          livenessProbe:
+            httpGet:
+              path: <健康检查路径，填写 /healthz>
+              port: <容器监听的端口，填写 8080>
+            initialDelaySeconds: <容器启动之后等待多少秒开始第一次探测，填写 5>
+            periodSeconds: <每隔多少秒探测一次，填写 5，默认值是 10>
+            timeoutSeconds: 1        # 单次探测的响应超时时间，默认值就是 1 秒，本次保留
+            failureThreshold: 3      # 连续失败多少次判定为失败，默认值就是 3 次，本次保留

@@ -1,0 +1,3 @@
+NAME                     READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-fd874688f-qs4ln   1/1     Running   0          63m   10.244.0.12   kind-control-plane   <none>           <none>
+webapp-fd874688f-rl4kv   1/1     Running   0          63m   10.244.0.13   kind-control-plane   <none>           <none>

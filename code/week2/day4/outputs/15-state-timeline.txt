@@ -1,0 +1,35 @@
+目标 Pod：webapp-f9856cb66-kdhqt
+uptime_seconds=90
+slow_start_seconds=40
+in_slow_start=false
+healthz_fault=false
+readyz_fault=false
+2026/09/21 09:44:21 webapp v6 正在监听 :8080
+2026/09/21 09:44:25 probe path=/healthz result=503 reason=still-starting uptime=4s
+2026/09/21 09:44:30 probe path=/healthz result=503 reason=still-starting uptime=9s
+2026/09/21 09:44:35 probe path=/healthz result=503 reason=still-starting uptime=14s
+2026/09/21 09:44:40 probe path=/healthz result=503 reason=still-starting uptime=19s
+2026/09/21 09:44:45 probe path=/healthz result=503 reason=still-starting uptime=24s
+2026/09/21 09:44:50 probe path=/healthz result=503 reason=still-starting uptime=29s
+2026/09/21 09:44:55 probe path=/healthz result=503 reason=still-starting uptime=34s
+2026/09/21 09:45:00 probe path=/healthz result=503 reason=still-starting uptime=39s
+2026/09/21 09:45:05 probe path=/healthz result=200 uptime=44s
+2026/09/21 09:45:05 probe path=/readyz result=200 uptime=44s
+2026/09/21 09:45:10 probe path=/healthz result=200 uptime=49s
+2026/09/21 09:45:10 probe path=/readyz result=200 uptime=49s
+2026/09/21 09:45:15 probe path=/healthz result=200 uptime=54s
+2026/09/21 09:45:15 probe path=/readyz result=200 uptime=54s
+2026/09/21 09:45:20 probe path=/healthz result=200 uptime=59s
+2026/09/21 09:45:20 probe path=/readyz result=200 uptime=59s
+2026/09/21 09:45:25 probe path=/healthz result=200 uptime=64s
+2026/09/21 09:45:25 probe path=/readyz result=200 uptime=64s
+2026/09/21 09:45:30 probe path=/healthz result=200 uptime=69s
+2026/09/21 09:45:30 probe path=/readyz result=200 uptime=69s
+2026/09/21 09:45:35 probe path=/healthz result=200 uptime=74s
+2026/09/21 09:45:35 probe path=/readyz result=200 uptime=74s
+2026/09/21 09:45:40 probe path=/healthz result=200 uptime=79s
+2026/09/21 09:45:40 probe path=/readyz result=200 uptime=79s
+2026/09/21 09:45:45 probe path=/healthz result=200 uptime=84s
+2026/09/21 09:45:45 probe path=/readyz result=200 uptime=84s
+2026/09/21 09:45:50 probe path=/healthz result=200 uptime=89s
+2026/09/21 09:45:50 probe path=/readyz result=200 uptime=89s
