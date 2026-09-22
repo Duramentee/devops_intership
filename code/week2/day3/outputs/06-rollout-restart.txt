@@ -1,0 +1,6 @@
+# 重启之后
+❯ kubectl rollout restart deploy/webapp
+deployment.apps/webapp restarted
+
+❯ kubectl exec deploy/webapp -- env | grep GREETING
+GREETING=Hello from ConfigMap changed

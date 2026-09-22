@@ -1,0 +1,15 @@
+# kubectl get cm -A >> 00-baseline-cm.txt
+NAMESPACE            NAME                                                   DATA   AGE
+default              kube-root-ca.crt                                       1      23d
+kube-node-lease      kube-root-ca.crt                                       1      23d
+kube-public          cluster-info                                           1      23d
+kube-public          kube-root-ca.crt                                       1      23d
+kube-system          coredns                                                1      23d
+kube-system          extension-apiserver-authentication                     6      23d
+kube-system          kube-apiserver-legacy-service-account-token-tracking   1      23d
+kube-system          kube-proxy                                             2      23d
+kube-system          kube-root-ca.crt                                       1      23d
+kube-system          kubeadm-config                                         1      23d
+kube-system          kubelet-config                                         1      23d
+local-path-storage   kube-root-ca.crt                                       1      23d
+local-path-storage   local-path-config                                      4      23d

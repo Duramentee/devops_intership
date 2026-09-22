@@ -1,0 +1,71 @@
+# Deployment 的填空骨架（文件方式）：把每一处尖括号替换成正确的取值，然后另存为 deploy.volume.yaml。
+#
+# 填写之前请依次确认下面七件事：
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+# 2. 这是一份独立的新 Deployment，名称是 webapp-vol，它的模板标签使用 app: webapp-vol，
+#    与 Day 2 那个 Service 的选择器 app: webapp 不同。这样做的原因是：如果两份配置不同的 Pod
+#    同时进入同一个 Service 的端点列表，从 Service 发起的请求会随机落到其中任意一个 Pod 上，
+#    观测到的结果将无法解释；让标签不同可以保证两个实验互相隔离，同时又共用同一个命名空间。
+# 3. 今天仍然保留 envFrom 段落，也就是同一个 Pod 内部同时使用两种注入方式。
+#    这样在修改 ConfigMap 之后，可以在一次请求的响应里同时看到「环境变量保持旧取值」与
+#    「文件变成新取值」两个结果，不需要在两个 Pod 之间来回切换。
+# 4. volumes 与 volumeMounts 是两个分开的列表，它们之间靠 name 字段建立对应关系：
+#    容器内的 volumeMounts 负责说明「挂到哪里」，Pod 级的 volumes 负责说明「挂什么」，
+#    两处 name 必须成对出现，只有一边存在时 Pod 会被 API Server 拒绝创建。
+# 5. ConfigMap 卷挂载之后，对象中的每一个键都会成为挂载目录下的一个文件，键名就是文件名。
+#    如果挂载目录与容器内原有的目录同名，原有文件会被挂载内容覆盖（本次实验使用新建目录，因此不会发生覆盖）。
+# 6. 两个挂载点分别对应应用读取的两个路径：/etc/webapp/GREETING 与 /etc/webapp-file/config.conf。
+#    这两个路径写在 code/week2/day3/go-webapp/main.go 的常量声明中，路径不一致时应用读不到文件。
+# 7. readOnly 是建议写法：应用只读取配置，不需要写入权限，把卷挂成只读可以避免应用意外修改配置内容。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-vol
+  labels:
+    app: webapp-vol
+spec:
+  replicas: 1                     # 期望的副本数量，本次实验设置为 1 就足够观察
+  selector:
+    matchLabels:
+      app: webapp-vol                      # 必须与下面模板中的同名标签完全一致
+  template:
+    metadata:
+      labels:
+        app: webapp-vol                    # 模板标签，必须与上面的选择器完全一致
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:v5                # 与另一份清单使用同一个镜像，差别只在配置的注入方式
+          ports:
+            - containerPort: 8080
+          envFrom:                 # 保留环境变量方式，用于与文件方式对照
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          volumeMounts:            # 容器级：说明把卷挂到哪个路径
+            - name: webapp             # 这个取值必须与下面 volumes 列表中某一项的 name 完全相同
+              mountPath: /etc/webapp        # 挂载之后该目录下会出现与 ConfigMap 键名同名的文件
+              readOnly: true
+            - name: webapp-file
+              mountPath: /etc/webapp-file
+              readOnly: true
+            - name: webapp-file
+              mountPath: /etc/webapp-sub/config.conf
+              subPath: config.conf
+              readOnly: true
+            - name: webapp-secret
+              mountPath: /etc/webapp-secret
+              readOnly: true
+          resources: {}
+      volumes:                     # Pod 级：说明要挂载哪些对象
+        - name: webapp
+          configMap:
+            name: webapp-config               # 被挂载的 ConfigMap 对象的名称
+        - name: webapp-file
+          configMap:
+            name: webapp-file-config               # 被挂载的另一个 ConfigMap 对象的名称
+        - name: webapp-secret
+          secret:
+            secretName: webapp-secret

@@ -1,0 +1,25 @@
+# kubectl describe cm webapp-config > outputs/02-describe-cm.txt
+Name:         webapp-config
+Namespace:    default
+Labels:       app=webapp-config
+Annotations:  <none>
+
+Data
+====
+APP_ENV:
+----
+dev
+
+FOO-BAR:
+----
+this-key-is-ignored
+
+GREERTING:
+----
+Hello from ConfigMap
+
+
+BinaryData
+====
+
+Events:  <none>

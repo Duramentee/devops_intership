@@ -1,0 +1,6 @@
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES      SELECTOR
+deployment.apps/webapp   2/2     2            2           2d    webapp       webapp:v4   app=webapp
+
+NAME                 TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/kubernetes   ClusterIP   10.96.0.1      <none>        443/TCP    23d   <none>
+service/webapp       ClusterIP   10.96.135.12   <none>        8080/TCP   23h   app=webapp

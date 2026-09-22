@@ -1,0 +1,18 @@
+# ❯ kubectl get cm webapp-config -o yaml > outputs/02-cm-yaml.txt
+apiVersion: v1
+data:
+  APP_ENV: dev
+  FOO-BAR: this-key-is-ignored
+  GREETING: Hello from ConfigMap
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"APP_ENV":"dev","FOO-BAR":"this-key-is-ignored","GREETING":"Hello from ConfigMap"},"kind":"ConfigMap","metadata":{"annotations":{},"labels":{"app":"webapp-config"},"name":"webapp-config","namespace":"default"}}
+  creationTimestamp: "2026-09-20T07:53:38Z"
+  labels:
+    app: webapp-config
+  name: webapp-config
+  namespace: default
+  resourceVersion: "407685"
+  uid: 68a6a4af-1d30-4490-af6d-e3867222eb1d

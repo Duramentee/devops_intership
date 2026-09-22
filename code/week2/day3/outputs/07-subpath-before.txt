@@ -1,0 +1,6 @@
+total 12
+drwxrwxrwx    3 root     root          4096 Sep 21 01:59 .
+drwxr-xr-x    1 root     root          4096 Sep 21 01:59 ..
+drwxr-xr-x    2 root     root          4096 Sep 21 01:59 ..2026_09_21_01_59_37.611228343
+lrwxrwxrwx    1 root     root            31 Sep 21 01:59 ..data -> ..2026_09_21_01_59_37.611228343
+lrwxrwxrwx    1 root     root            18 Sep 21 01:59 config.conf -> ..data/config.conf

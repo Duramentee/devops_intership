@@ -1,0 +1,9 @@
+kubectl exec deploy/webapp -- wget -qO- http://localhost:8080/ > outputs/03-app-report-env.txt
+env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+
+❯ kubectl exec deploy/webapp -- wget -qO- http://localhost:8080/config
+<读取失败：open /etc/webapp-file/config.conf: no such file or directory>

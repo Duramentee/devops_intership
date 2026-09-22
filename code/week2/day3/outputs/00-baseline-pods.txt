@@ -1,0 +1,4 @@
+# kubectl get po -o wide --show-labels >> 00-baseline-pods.txt
+NAME                      READY   STATUS    RESTARTS        AGE   IP           NODE                 NOMINATED NODE   READINESS GATES   LABELS
+webapp-7dbcc8ff4b-qs5xh   1/1     Running   1 (5h18m ago)   22h   10.244.0.3   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=7dbcc8ff4b
+webapp-7dbcc8ff4b-r8jvf   1/1     Running   2 (5h18m ago)   2d    10.244.0.2   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=7dbcc8ff4b

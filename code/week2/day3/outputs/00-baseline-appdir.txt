@@ -1,0 +1,2 @@
+# kubectl exec deploy/webapp -- sh -c '...' >> outputs/00-baseline-appdir.txt
+配置目录不存在

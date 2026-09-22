@@ -1,0 +1,37 @@
+# ConfigMap 的填空骨架：把每一处尖括号替换成正确的取值，然后另存为 cm.yaml。
+#
+# 填写之前请依次确认下面五件事：
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+# 2. 不要写入 status 段落。status 属于服务端字段，由 Kubernetes 写入并持续更新，手写清单时必须删除它。
+# 3. 本文件一共定义两个 ConfigMap 对象，中间用 --- 分隔，它们的分工是不同的：
+#    webapp-config 的三个键分别用于观察「键名合法时以环境变量方式注入」「以文件方式挂载之后的取值变化」
+#    与「键名不合法时被静默忽略」三种现象；
+#    webapp-file 只包含一个键 config.conf，它的键名同时就是挂载之后容器内的文件名，
+#    因此这个对象只用于文件方式，不用于环境变量方式。
+# 4. data 段落中的所有取值都是字符串。因此 listen_port=8080 这类取值必须写成字符串，
+#    如果写成不带引号的 8080，API Server 会因为类型不匹配而拒绝创建对象。
+# 5. binaryData 段落用于存放二进制内容（取值必须是 base64 编码），本次实验不使用。
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-config                 # ConfigMap 的名称，Deployment 通过这个名称引用它
+  labels:
+    app: webapp-config            # 这个标签用于标记 ConfigMap 对象本身，与 Deployment 的选择器没有关系
+data:
+  GREETING: "Hello from ConfigMap"         # 第一个键：取值是一个问候语，它既会被注入成环境变量，也会成为卷内的一个文件
+  APP_ENV: dev                              # 第二个键：取值是环境名称，只用于环境变量方式
+  FOO-BAR: this-key-is-ignored              # 第三个键：键名中包含短横线。短横线在环境变量名称中不合法，
+                                            # 因此这个键以环境变量方式注入时会被静默忽略，只能以文件方式读取
+                                            # （教材 7.4.4 节，p.332：键名格式不正确时忽略对应条目，忽略时不发出事件通知）
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-file-config
+  labels:
+    app: webapp-file-config
+data:
+  config.conf: |           # 竖线表示块标量，下面的内容整体作为这一个键的取值，# 挂载之后容器内会出现一个名为 config.conf 的文件  # 块标量内部每一行的缩进都必须比键名所在的行更深，本次实验使用四个空格   # 这一行的取值请你自行指定，取值范围是 on 与 off                  
+    listen_port=8080       
+    log_level=info
+    feature_flag=on        

@@ -1,0 +1,14 @@
+# 修改后得到
+❯ kubectl exec deploy/webapp-vol -- env | grep GREETING
+GREETING=Hello from ConfigMap
+
+❯ kubectl exec deploy/webapp-vol -- cat /etc/webapp/GREETING
+Hello from ConfigMap changed%      
+
+❯ kubectl exec deploy/webapp-vol -- wget -qO- http://localhost:8080/
+env  GREETING    = "Hello from ConfigMap"
+file GREETING    = "Hello from ConfigMap changed"
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+

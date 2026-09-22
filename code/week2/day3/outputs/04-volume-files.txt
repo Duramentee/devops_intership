@@ -1,0 +1,24 @@
+/etc/webapp:
+total 12
+drwxrwxrwx    3 root     root          4096 Sep 20 08:08 .
+drwxr-xr-x    1 root     root          4096 Sep 20 08:08 ..
+drwxr-xr-x    2 root     root          4096 Sep 20 08:08 ..2026_09_20_08_08_59.1939813906
+lrwxrwxrwx    1 root     root            32 Sep 20 08:08 ..data -> ..2026_09_20_08_08_59.1939813906
+lrwxrwxrwx    1 root     root            14 Sep 20 08:08 APP_ENV -> ..data/APP_ENV
+lrwxrwxrwx    1 root     root            14 Sep 20 08:08 FOO-BAR -> ..data/FOO-BAR
+lrwxrwxrwx    1 root     root            16 Sep 20 08:08 GREERTING -> ..data/GREERTING
+lrwxrwxrwx    1 root     root            15 Sep 20 08:08 GREETING -> ..data/GREETING
+
+/etc/webapp-file:
+total 12
+drwxrwxrwx    3 root     root          4096 Sep 20 08:08 .
+drwxr-xr-x    1 root     root          4096 Sep 20 08:08 ..
+drwxr-xr-x    2 root     root          4096 Sep 20 08:08 ..2026_09_20_08_08_59.1111232560
+lrwxrwxrwx    1 root     root            32 Sep 20 08:08 ..data -> ..2026_09_20_08_08_59.1111232560
+lrwxrwxrwx    1 root     root            18 Sep 20 08:08 config.conf -> ..data/config.conf
+
+❯ kubectl exec deploy/webapp-vol -- cat /etc/webapp-file/config.conf
+listen_port=8080       
+log_level=debug
+feature_flag=on
+
