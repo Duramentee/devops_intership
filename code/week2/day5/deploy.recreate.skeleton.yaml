@@ -1,0 +1,66 @@
+# Recreate 策略的对照实验清单：把每一处尖括号替换成正确的取值，
+# 然后另存为 deploy.recreate.yaml。
+#
+# 这份清单与 deploy.rollout.yaml 的差别只有一处，也就是 spec.strategy.type 的取值：
+# 本次填 Recreate，因此 Deployment 在替换 Pod 时的顺序与滚动升级完全相反。
+#
+# 填写要点：
+#
+# 1. 使用 Recreate 时不允许出现 spec.strategy.rollingUpdate 段落，
+#    因为 maxSurge 与 maxUnavailable 这两个字段只在 RollingUpdate 策略下有意义。
+#    保留该段落会让 API Server 直接返回校验错误。
+#
+# 2. 其余字段全部与 deploy.rollout.yaml 保持一致，特别是镜像标签必须写成 deploy.rollout.yaml 中当前的取值，
+#    这样两次实验之间唯一的自变量就是策略类型。
+#
+# 3. 执行 apply 之后应当按下面的顺序观察，并把两段输出粘贴进 outputs 目录：
+#    ① 执行 kubectl get po -w，观察旧 Pod 是否先进入 Terminating 状态；
+#    ② 在同一份输出中查找是否存在「可用 Pod 数量为 0」的时间窗；
+#    ③ 执行 kubectl get svc 与集群内的访问命令，确认这段时间窗内请求是否失败。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  revisionHistoryLimit: <保留多少个旧 ReplicaSet 作为历史版本>
+  progressDeadlineSeconds: <升级卡住多少秒之后把 Progressing 条件写成 False>
+  strategy:
+    type: <策略类型，本次填 Recreate>
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:<与 deploy.rollout.yaml 中当前使用的标签相同>
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
