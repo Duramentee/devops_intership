@@ -1,6 +1,7 @@
 # Day 1 学习笔记 · Pod 与 Deployment
 
 > 日期：2026-09-18 · 代码：`code/week2/day1/`（`pod.webapp.yaml`、`deploy.webapp.yaml`）
+> 状态：**已提炼为归档**（2026-09-22）。复习时不需要通读本文件，只需阅读 `notes/week2/提炼-反例与关系.md`；本文件保留采集记录与逐字段解析，用于回查具体取值。
 > 配套资料：`docs/k8s_in_action/02-Pod与副本机制.md`，以及 `plan/week2/任务明细.md` 中的 Day 1
 > 起点资产：第 1 周构建的镜像 `webapp:v4`（占用磁盘 25.3MB、以非 root 用户 uid 10001 运行、基于 alpine 底座）
 > 本周的模型变化：从「直接命令 Docker 执行动作」转为「声明期望的状态，由 Kubernetes 的控制器把实际状态调整到期望状态」。

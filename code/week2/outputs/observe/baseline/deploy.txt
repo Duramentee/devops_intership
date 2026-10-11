@@ -1,0 +1,4 @@
+### kubectl get deploy -o wide -n default
+### 快照=baseline 时间=20260925-141328
+NAME     READY   UP-TO-DATE   AVAILABLE   AGE     CONTAINERS   IMAGES      SELECTOR
+webapp   2/2     2            2           6d23h   webapp       webapp:v7   app=webapp

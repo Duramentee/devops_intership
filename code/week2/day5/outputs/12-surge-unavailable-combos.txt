@@ -1,0 +1,122 @@
+# 步骤 12：maxSurge 与 maxUnavailable 的取值组合实验
+# 记录时刻（UTC）：2026-09-22T07:29:58Z
+# 副本数量固定为 2，每种组合都配合一次镜像变更来触发滚动升级，
+# 因为只修改策略字段不会创建新的 ReplicaSet，也就不会发生任何 Pod 替换（该结论见 04b-apply-strategy-clean.txt）。
+
+===== 组合一：maxSurge=1 maxUnavailable=0（本条已在步骤 6 的升级窗口中得到）=====
+# 依据：07-rs-watch.txt 中 webapp-54c66c8c74 的 DESIRED 由 0 增到 1，webapp-7f78498c55 由 2 减到 1，
+# 随后 webapp-54c66c8c74 增到 2、webapp-7f78498c55 减到 0，两个 ReplicaSet 的 DESIRED 之和最大为 3 最小为 2，
+# 因此 Pod 总数上限等于 2 加 maxSurge，可用 Pod 数量下限等于 2 减 maxUnavailable（本次为 2）。
+
+===== 组合二：maxSurge=0 maxUnavailable=1，镜像由 webapp:v6 变为 webapp:v7 =====
+# 变更之前的镜像：webapp:v6
+# 本次使用的清单：/tmp/deploy.combo01.yaml
+    # 4. 本次要新增的第二个字段是 spec.strategy.rollingUpdate.maxSurge，
+    # 5. 本次要新增的第三个字段是 spec.strategy.rollingUpdate.maxUnavailable，
+    #    取百分数时由控制平面向下取整，并且它与 maxSurge 不允许同时为 0。
+          maxSurge: 0
+          maxUnavailable: 1
+              image: webapp:v7
+
+--- apply 与 rollout status ---
+deployment.apps/webapp configured
+--- apply 返回之后立即采集的 Pod 快照 ---
+NAME                      READY   STATUS              RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running             0          11m   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-c8r6x   0/1     ContainerCreating   0          0s    <none>        kind-control-plane   <none>           <none>
+webapp-7f78498c55-88kbg   1/1     Running             0          42s   10.244.0.20   kind-control-plane   <none>           <none>
+webapp-7f78498c55-94tvr   1/1     Terminating         0          36s   10.244.0.21   kind-control-plane   <none>           <none>
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 of 2 updated replicas are available...
+Waiting for deployment "webapp" rollout to finish: 1 of 2 updated replicas are available...
+deployment "webapp" successfully rolled out
+--- 替换结束之后的 ReplicaSet ---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   16    webapp:v7   2
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   15    webapp:v6   0
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+--- Deployment 的扩缩容事件（带时刻，最后 12 条）---
+TIME                   REASON              MESSAGE
+2026-09-22T07:01:52Z   ScalingReplicaSet   Scaled down replica set webapp-f9856cb66 from 2 to 1
+2026-09-22T07:01:58Z   ScalingReplicaSet   Scaled down replica set webapp-f9856cb66 from 1 to 0
+2026-09-22T07:29:17Z   ScalingReplicaSet   Scaled up replica set webapp-7f78498c55 from 0 to 1
+2026-09-22T07:29:23Z   ScalingReplicaSet   Scaled up replica set webapp-7f78498c55 from 1 to 2
+2026-09-22T07:29:23Z   ScalingReplicaSet   Scaled down replica set webapp-54c66c8c74 from 2 to 1
+2026-09-22T07:29:29Z   ScalingReplicaSet   Scaled down replica set webapp-54c66c8c74 from 1 to 0
+2026-09-22T07:29:59Z   ScalingReplicaSet   Scaled up replica set webapp-54c66c8c74 from 0 to 1
+2026-09-22T07:29:59Z   ScalingReplicaSet   Scaled down replica set webapp-7f78498c55 from 2 to 1
+2026-09-22T07:30:05Z   ScalingReplicaSet   Scaled down replica set webapp-7f78498c55 from 1 to 0
+2026-09-22T07:30:06Z   ScalingReplicaSet   Scaled up replica set webapp-54c66c8c74 from 1 to 2
+
+===== 组合三：maxSurge=100% maxUnavailable=0，镜像由 webapp:v7 变为 webapp:v6 =====
+# 变更之前的镜像：webapp:v7
+# 本次使用的清单：/tmp/deploy.combo100.yaml
+    # 4. 本次要新增的第二个字段是 spec.strategy.rollingUpdate.maxSurge，
+    # 5. 本次要新增的第三个字段是 spec.strategy.rollingUpdate.maxUnavailable，
+    #    取百分数时由控制平面向下取整，并且它与 maxSurge 不允许同时为 0。
+          maxSurge: "100%"
+          maxUnavailable: 0
+              image: webapp:v6
+
+--- apply 与 rollout status ---
+deployment.apps/webapp configured
+--- apply 返回之后立即采集的 Pod 快照 ---
+NAME                      READY   STATUS              RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running             0          11m   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-c8r6x   1/1     Running             0          11s   10.244.0.22   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-cwmgf   1/1     Running             0          4s    10.244.0.23   kind-control-plane   <none>           <none>
+webapp-7f78498c55-cnbwl   0/1     ContainerCreating   0          0s    <none>        kind-control-plane   <none>           <none>
+webapp-7f78498c55-sv9sn   0/1     ContainerCreating   0          0s    <none>        kind-control-plane   <none>           <none>
+Waiting for deployment "webapp" rollout to finish: 2 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 2 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 2 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out
+--- 替换结束之后的 ReplicaSet ---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   16    webapp:v7   0
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   17    webapp:v6   2
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+--- Deployment 的扩缩容事件（带时刻，最后 12 条）---
+TIME                   REASON              MESSAGE
+2026-09-22T07:01:52Z   ScalingReplicaSet   Scaled down replica set webapp-f9856cb66 from 2 to 1
+2026-09-22T07:01:58Z   ScalingReplicaSet   Scaled down replica set webapp-f9856cb66 from 1 to 0
+2026-09-22T07:29:17Z   ScalingReplicaSet   Scaled up replica set webapp-7f78498c55 from 0 to 1
+2026-09-22T07:29:23Z   ScalingReplicaSet   Scaled up replica set webapp-7f78498c55 from 1 to 2
+2026-09-22T07:29:59Z   ScalingReplicaSet   Scaled up replica set webapp-54c66c8c74 from 0 to 1
+2026-09-22T07:29:59Z   ScalingReplicaSet   Scaled down replica set webapp-7f78498c55 from 2 to 1
+2026-09-22T07:30:05Z   ScalingReplicaSet   Scaled down replica set webapp-7f78498c55 from 1 to 0
+2026-09-22T07:30:06Z   ScalingReplicaSet   Scaled up replica set webapp-54c66c8c74 from 1 to 2
+2026-09-22T07:30:10Z   ScalingReplicaSet   Scaled up replica set webapp-7f78498c55 from 0 to 2
+2026-09-22T07:30:17Z   ScalingReplicaSet   Scaled down replica set webapp-54c66c8c74 from 2 to 1
+2026-09-22T07:30:17Z   ScalingReplicaSet   Scaled down replica set webapp-54c66c8c74 from 1 to 0
+
+===== 恢复标准组合：maxSurge=1 maxUnavailable=0，镜像由 webapp:v6 变回 webapp:v7 =====
+deployment.apps/webapp configured
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out
+image=webapp:v7
+maxSurge=1
+maxUnavailable=0
+generation=22
+revision=18
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   18    webapp:v7   2
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   17    webapp:v6   0
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0

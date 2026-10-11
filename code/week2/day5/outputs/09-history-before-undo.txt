@@ -1,0 +1,32 @@
+# 步骤 9：查看版本历史并执行回滚（客户端仍处于运行状态）
+# 记录时刻（UTC）：2026-09-22T07:29:16Z
+# 客户端日志在本步骤开始之前的行数：4279
+
+===== 回滚之前的版本历史 =====
+deployment.apps/webapp 
+REVISION  CHANGE-CAUSE
+6         <none>
+7         <none>
+9         <none>
+10        <none>
+13        <none>
+14        <none>
+
+
+===== 当前使用的镜像与 revision =====
+image=webapp:v7
+revision=14
+generation=18
+
+===== 执行回滚 =====
+Warning: resource deployments/webapp was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/webapp rolled back
+
+===== 回滚的升级过程 =====
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out

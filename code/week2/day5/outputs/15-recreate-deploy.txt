@@ -1,0 +1,49 @@
+# 步骤 15：Recreate 策略的对照实验
+# 记录时刻（UTC）：2026-09-22T07:33:34Z
+# 使用的清单：deploy.recreate.yaml（已经填写完整，strategy.type 为 Recreate，image 为 webapp:v6）
+# 说明（补充）：骨架的填写要点说「镜像标签必须写成 deploy.rollout.yaml 中当前的取值」，
+# 但那样就不会发生任何 Pod 模板变更，也就不会有任何 Pod 被替换，观察不到 Recreate 的行为。
+# 因此本次让镜像由 webapp:v7 变为 webapp:v6，与策略变更一起生效。
+
+===== 变更之前 =====
+image=webapp:v7
+strategy=RollingUpdate
+revision=20
+
+===== 执行 apply 与 rollout status =====
+deployment.apps/webapp configured
+--- apply 返回之后立即采集的 Pod 快照 ---
+NAME                      READY   STATUS        RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running       0          2s      10.244.0.30   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-6rkzf   1/1     Terminating   0          3m10s   10.244.0.27   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-fj9zg   1/1     Terminating   0          3m17s   10.244.0.26   kind-control-plane   <none>           <none>
+replicas=
+availableReplicas=
+unavailableReplicas=
+Waiting for deployment "webapp" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "webapp" rollout to finish: 1 of 2 updated replicas are available...
+deployment "webapp" successfully rolled out
+
+===== 替换之后 =====
+image=webapp:v6
+strategy=Recreate
+revision=21
+generation=25
+availableReplicas=2
+NAME                REV   IMG                     DESIRED
+webapp-54c66c8c74   20    webapp:v7               0
+webapp-5bd67f6c57   9     webapp:v6               0
+webapp-679979b5d6   19    webapp:does-not-exist   0
+webapp-7f78498c55   21    webapp:v6               2
+webapp-7f9d7cc67    7     webapp:v6               0
+webapp-f9856cb66    10    webapp:v6               0
+
+===== Deployment 的扩缩容事件（带时刻，最后 8 条）=====
+2026-09-22T07:30:05Z   Scaled down replica set webapp-7f78498c55 from 1 to 0
+2026-09-22T07:30:10Z   Scaled up replica set webapp-7f78498c55 from 0 to 2
+2026-09-22T07:30:17Z   Scaled down replica set webapp-54c66c8c74 from 2 to 1
+2026-09-22T07:30:17Z   Scaled down replica set webapp-54c66c8c74 from 1 to 0
+2026-09-22T07:30:18Z   Scaled up replica set webapp-54c66c8c74 from 0 to 1
+2026-09-22T07:30:25Z   Scaled down replica set webapp-7f78498c55 from 2 to 1
+2026-09-22T07:30:25Z   Scaled up replica set webapp-54c66c8c74 from 1 to 2
+2026-09-22T07:33:35Z   (combined from similar events): Scaled down replica set webapp-54c66c8c74 from 2 to 0

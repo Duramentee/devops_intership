@@ -1,0 +1,43 @@
+# 把 Deployment 的镜像换成 webapp:v6，作为本次升级实验的起点版本
+# 记录时刻（UTC）：2026-09-22T07:26:08Z
+# 使用的清单：/tmp/deploy.rollout.v6.yaml，它由 deploy.rollout.yaml 只改动 image 一个字段得到
+
+===== 变更之前 =====
+image=webapp:v7
+generation=16
+revision=12
+连续访问客户端 curl-loop 的日志行数：2042
+
+===== 执行 apply 并等待升级完成 =====
+deployment.apps/webapp configured
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out
+
+===== 变更之后 =====
+image=webapp:v6
+generation=17
+revision=13
+--- ReplicaSet ---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   12    webapp:v7   0
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   13    webapp:v6   2
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+--- Pod ---
+NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          7m31s   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-v6cff   0/1     Error     0          18m     10.244.0.12   kind-control-plane   <none>           <none>
+webapp-7f78498c55-7bdb2   1/1     Running   0          14s     10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-pdz8k   1/1     Running   0          7s      10.244.0.17   kind-control-plane   <none>           <none>
+
+--- 客户端最近 3 行输出（预期：http=404 与 body=404 page not found）---
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17

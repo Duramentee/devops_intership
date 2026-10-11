@@ -1,0 +1,18 @@
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES      SELECTOR     LABELS
+deployment.apps/webapp   2/2     2            2           4d    webapp       webapp:v6   app=webapp   app=webapp
+
+NAME                                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES      SELECTOR                                  LABELS
+replicaset.apps/webapp-5bd67f6c57   0         0         0       21h   webapp       webapp:v6   app=webapp,pod-template-hash=5bd67f6c57   app=webapp,env=dev,pod-template-hash=5bd67f6c57
+replicaset.apps/webapp-654bfc4f58   0         0         0       23h   webapp       webapp:v5   app=webapp,pod-template-hash=654bfc4f58   app=webapp,env=dev,pod-template-hash=654bfc4f58
+replicaset.apps/webapp-77c846c8d8   0         0         0       46h   webapp       webapp:v5   app=webapp,pod-template-hash=77c846c8d8   app=webapp,env=dev,pod-template-hash=77c846c8d8
+replicaset.apps/webapp-7944f66797   0         0         0       46h   webapp       webapp:v5   app=webapp,pod-template-hash=7944f66797   app=webapp,env=dev,pod-template-hash=7944f66797
+replicaset.apps/webapp-7dbcc8ff4b   0         0         0       4d    webapp       webapp:v4   app=webapp,pod-template-hash=7dbcc8ff4b   app=webapp,env=dev,pod-template-hash=7dbcc8ff4b
+replicaset.apps/webapp-7f78498c55   0         0         0       21h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55   app=webapp,env=dev,pod-template-hash=7f78498c55
+replicaset.apps/webapp-7f9d7cc67    0         0         0       21h   webapp       webapp:v6   app=webapp,pod-template-hash=7f9d7cc67    app=webapp,env=dev,pod-template-hash=7f9d7cc67
+replicaset.apps/webapp-855d94f5b8   0         0         0       46h   webapp       webapp:v5   app=webapp,pod-template-hash=855d94f5b8   app=webapp,env=dev,pod-template-hash=855d94f5b8
+replicaset.apps/webapp-f9856cb66    2         2         2       21h   webapp       webapp:v6   app=webapp,pod-template-hash=f9856cb66    app=webapp,env=dev,pod-template-hash=f9856cb66
+replicaset.apps/webapp-fd874688f    0         0         0       23h   webapp       webapp:v6   app=webapp,pod-template-hash=fd874688f    app=webapp,env=dev,pod-template-hash=fd874688f
+
+NAME                         READY   STATUS    RESTARTS        AGE   IP           NODE                 NOMINATED NODE   READINESS GATES   LABELS
+pod/webapp-f9856cb66-bsq9l   1/1     Running   2 (6h18m ago)   21h   10.244.0.6   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=f9856cb66
+pod/webapp-f9856cb66-kdhqt   1/1     Running   2 (6h18m ago)   21h   10.244.0.2   kind-control-plane   <none>           <none>            app=webapp,env=dev,pod-template-hash=f9856cb66

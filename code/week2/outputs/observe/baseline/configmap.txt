@@ -1,0 +1,6 @@
+### kubectl get cm -o wide
+### 快照=baseline 时间=20260925-141328
+NAME                 DATA   AGE
+kube-root-ca.crt     1      28d
+webapp-config        3      4d22h
+webapp-file-config   1      4d22h

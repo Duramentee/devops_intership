@@ -1,0 +1,6 @@
+### kubectl get endpoints -n default
+### 快照=baseline 时间=20260925-141328
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME         ENDPOINTS                         AGE
+kubernetes   172.18.0.2:6443                   28d
+webapp       10.244.0.3:8080,10.244.0.4:8080   5d22h

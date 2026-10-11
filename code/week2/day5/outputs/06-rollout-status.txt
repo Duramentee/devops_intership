@@ -1,0 +1,59 @@
+# 步骤 6 的忠实重做：客户端 curl-loop 处于运行状态，把镜像由 webapp:v6 升级到 webapp:v7
+# 记录时刻（UTC）：2026-09-22T07:27:26Z
+# 客户端日志在本步骤开始之前的行数：3605
+
+===== 升级之前 =====
+image=webapp:v6
+generation=17
+revision=13
+maxSurge=1
+maxUnavailable=0
+
+===== 执行 apply（deploy.rollout.yaml，image 为 webapp:v7）=====
+deployment.apps/webapp configured
+
+===== 升级过程中的中间状态（apply 返回之后立即采集）=====
+--- Pod ---
+NAME                      READY   STATUS              RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running             0          8m36s   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-lx9cs   0/1     ContainerCreating   0          1s      <none>        kind-control-plane   <none>           <none>
+webapp-7f78498c55-7bdb2   1/1     Running             0          79s     10.244.0.16   kind-control-plane   <none>           <none>
+webapp-7f78498c55-pdz8k   1/1     Running             0          72s     10.244.0.17   kind-control-plane   <none>           <none>
+--- Deployment 的 status 段落 ---
+Available=True reason=MinimumReplicasAvailable
+Progressing=True reason=ReplicaSetUpdated
+replicas=3
+updatedReplicas=1
+readyReplicas=2
+availableReplicas=2
+unavailableReplicas=1
+
+===== kubectl rollout status deploy/webapp 的输出 =====
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out
+
+===== 升级之后 =====
+image=webapp:v7
+generation=18
+revision=14
+replicas=2
+availableReplicas=2
+--- ReplicaSet ---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   14    webapp:v7   2
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   13    webapp:v6   0
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+--- Pod ---
+NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          8m49s   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-lx9cs   1/1     Running   0          14s     10.244.0.18   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-v9kn2   1/1     Running   0          7s      10.244.0.19   kind-control-plane   <none>           <none>
+webapp-7f78498c55-pdz8k   0/1     Error     0          85s     10.244.0.17   kind-control-plane   <none>           <none>

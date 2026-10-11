@@ -1,6 +1,7 @@
 # Day 2 学习笔记 · Service 与标签选择器
 
 > 日期：2026-09-19 · 代码：`code/week2/day2/`（`svc-clusterip.yaml`、`svc-nodeport.yaml`、`outputs/`）
+> 状态：**已提炼为归档**（2026-09-22）。复习时不需要通读本文件，只需阅读 `notes/week2/提炼-反例与关系.md`；本文件保留采集记录与逐字段解析，用于回查具体取值。
 > 配套资料：`docs/k8s_in_action/03-Service与存储.md`、教材第 5 章（p.207-260）与第 11 章 5「kube-proxy」（p.523-526）
 > 起点资产：Day 1 创建的 Deployment `webapp`（副本数量为 3，Pod 标签包含 `app=webapp` 与 `env=dev`），以及镜像 `webapp:v4`
 > 今日的模型变化：从「直接访问 Pod 的 IP 地址」转为「访问 Service 提供的稳定虚拟地址，由节点上的 kube-proxy 负责写入转发规则」

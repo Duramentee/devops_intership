@@ -1,0 +1,5 @@
+### kubectl get po -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,RESTARTS:.status.containerStatuses[0].restartCount
+### 快照=baseline 时间=20260925-141328
+NAME                      READY   RESTARTS
+webapp-54c66c8c74-kd4gx   true    5
+webapp-54c66c8c74-pmc4c   true    5

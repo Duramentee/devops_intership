@@ -1,0 +1,28 @@
+# 说明：本文件是升级过程中 kubectl get rs -w -o wide 的连续输出，
+# 由后台执行的 timeout 25 kubectl get rs -w -o wide 生成，覆盖升级开始之前到升级完成之后。
+# 记录时刻（UTC）：2026-09-22T07:27:26Z
+
+NAME                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES      SELECTOR
+webapp-54c66c8c74   0         0         0       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-5bd67f6c57   0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=5bd67f6c57
+webapp-7f78498c55   2         2         2       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f9d7cc67    0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f9d7cc67
+webapp-f9856cb66    0         0         0       21h   webapp       webapp:v6   app=webapp,pod-template-hash=f9856cb66
+webapp-fd874688f    0         0         0       23h   webapp       webapp:v6   app=webapp,pod-template-hash=fd874688f
+webapp-54c66c8c74   0         0         0       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-54c66c8c74   1         0         0       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-54c66c8c74   1         0         0       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-54c66c8c74   1         1         0       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-54c66c8c74   1         1         1       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-7f78498c55   1         2         2       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f78498c55   1         2         2       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-54c66c8c74   2         1         1       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-7f78498c55   1         1         1       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-54c66c8c74   2         1         1       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-54c66c8c74   2         2         1       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-7f78498c55   1         1         1       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-54c66c8c74   2         2         2       19m   webapp       webapp:v7   app=webapp,pod-template-hash=54c66c8c74
+webapp-7f78498c55   0         1         1       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f78498c55   0         1         1       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f78498c55   0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f78498c55   0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55

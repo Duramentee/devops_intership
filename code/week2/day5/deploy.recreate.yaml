@@ -1,0 +1,56 @@
+# Recreate 策略的对照实验清单。
+# 填写说明：
+#   1. spec.strategy.type 填 Recreate，表示先删除全部旧 Pod 再创建新 Pod。
+#   2. Recreate 策略下不允许出现 spec.strategy.rollingUpdate 段落，
+#      maxSurge 与 maxUnavailable 两个字段只在 RollingUpdate 策略下有意义。
+#   3. revisionHistoryLimit 与 progressDeadlineSeconds 与 deploy.rollout.yaml 保持一致，
+#      这样两次实验之间的自变量只有策略类型与镜像标签两项。
+#   4. 容器段落与 deploy.rollout.yaml 完全一致，只有 image 换成 webapp:v6，
+#      用来制造一次真实的 Pod 模板变更，否则不会发生任何替换。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 20
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:v6
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3

@@ -1,0 +1,9 @@
+### kubectl get rs -n default
+### 快照=baseline 时间=20260925-141328
+NAME                DESIRED   CURRENT   READY   AGE
+webapp-54c66c8c74   2         2         2       2d23h
+webapp-5bd67f6c57   0         0         0       3d21h
+webapp-679979b5d6   0         0         0       2d22h
+webapp-7f78498c55   0         0         0       3d21h
+webapp-7f9d7cc67    0         0         0       3d21h
+webapp-f9856cb66    0         0         0       3d20h

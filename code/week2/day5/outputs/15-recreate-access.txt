@@ -1,0 +1,259 @@
+# 步骤 15：Recreate 策略下的连续访问记录（客户端 Pod curl-loop 的容器日志）
+# 记录时刻（UTC）：2026-09-22T07:34:29Z
+# 请求地址：http://webapp:8080/version，间隔 0.2 秒，单次超时 2 秒
+# 判别标记：body=version=v7 表示由 webapp:v7 应答；body=env 表示由 webapp:v6 应答；http=000 表示连接未能建立
+
+===== 统计 =====
+请求行数=232
+http=000 的行数=13
+http=200 的行数=221
+第一次失败时刻=07:33:35
+最后一次失败时刻=07:33:41
+
+===== 每一秒的失败次数 =====
+      3 07:33:35
+      1 07:33:36
+      4 07:33:38
+      4 07:33:39
+      1 07:33:41
+
+===== 全部请求行 =====
+07:33:34 http=200 body=version=v7
+07:33:35 http=200 body=version=v7
+07:33:35 http=200 body=version=v7
+07:33:35 http=000 body=version=v7
+07:33:35 http=000 body=version=v7
+07:33:35 http=000 body=version=v7
+07:33:36 http=000 body=version=v7
+07:33:38 http=000 body=version=v7
+07:33:38 http=000 body=version=v7
+07:33:38 http=000 body=version=v7
+07:33:38 http=000 body=version=v7
+07:33:39 http=000 body=version=v7
+07:33:39 http=000 body=version=v7
+07:33:39 http=000 body=version=v7
+07:33:39 http=000 body=version=v7
+07:33:41 http=000 body=version=v7
+07:33:42 http=200 body=env  GREETING    = "Hello from C
+07:33:43 http=200 body=env  GREETING    = "Hello from C
+07:33:43 http=200 body=env  GREETING    = "Hello from C
+07:33:43 http=200 body=env  GREETING    = "Hello from C
+07:33:44 http=200 body=env  GREETING    = "Hello from C
+07:33:44 http=200 body=env  GREETING    = "Hello from C
+07:33:44 http=200 body=env  GREETING    = "Hello from C
+07:33:44 http=200 body=env  GREETING    = "Hello from C
+07:33:45 http=200 body=env  GREETING    = "Hello from C
+07:33:45 http=200 body=env  GREETING    = "Hello from C
+07:33:45 http=200 body=env  GREETING    = "Hello from C
+07:33:45 http=200 body=env  GREETING    = "Hello from C
+07:33:45 http=200 body=env  GREETING    = "Hello from C
+07:33:46 http=200 body=env  GREETING    = "Hello from C
+07:33:46 http=200 body=env  GREETING    = "Hello from C
+07:33:46 http=200 body=env  GREETING    = "Hello from C
+07:33:46 http=200 body=env  GREETING    = "Hello from C
+07:33:46 http=200 body=env  GREETING    = "Hello from C
+07:33:47 http=200 body=env  GREETING    = "Hello from C
+07:33:47 http=200 body=env  GREETING    = "Hello from C
+07:33:47 http=200 body=env  GREETING    = "Hello from C
+07:33:47 http=200 body=env  GREETING    = "Hello from C
+07:33:48 http=200 body=env  GREETING    = "Hello from C
+07:33:48 http=200 body=env  GREETING    = "Hello from C
+07:33:48 http=200 body=env  GREETING    = "Hello from C
+07:33:48 http=200 body=env  GREETING    = "Hello from C
+07:33:48 http=200 body=env  GREETING    = "Hello from C
+07:33:49 http=200 body=env  GREETING    = "Hello from C
+07:33:49 http=200 body=env  GREETING    = "Hello from C
+07:33:49 http=200 body=env  GREETING    = "Hello from C
+07:33:49 http=200 body=env  GREETING    = "Hello from C
+07:33:49 http=200 body=env  GREETING    = "Hello from C
+07:33:50 http=200 body=env  GREETING    = "Hello from C
+07:33:50 http=200 body=env  GREETING    = "Hello from C
+07:33:50 http=200 body=env  GREETING    = "Hello from C
+07:33:50 http=200 body=env  GREETING    = "Hello from C
+07:33:50 http=200 body=env  GREETING    = "Hello from C
+07:33:51 http=200 body=env  GREETING    = "Hello from C
+07:33:51 http=200 body=env  GREETING    = "Hello from C
+07:33:51 http=200 body=env  GREETING    = "Hello from C
+07:33:51 http=200 body=env  GREETING    = "Hello from C
+07:33:52 http=200 body=env  GREETING    = "Hello from C
+07:33:52 http=200 body=env  GREETING    = "Hello from C
+07:33:52 http=200 body=env  GREETING    = "Hello from C
+07:33:52 http=200 body=env  GREETING    = "Hello from C
+07:33:52 http=200 body=env  GREETING    = "Hello from C
+07:33:53 http=200 body=env  GREETING    = "Hello from C
+07:33:53 http=200 body=env  GREETING    = "Hello from C
+07:33:53 http=200 body=env  GREETING    = "Hello from C
+07:33:53 http=200 body=env  GREETING    = "Hello from C
+07:33:53 http=200 body=env  GREETING    = "Hello from C
+07:33:54 http=200 body=env  GREETING    = "Hello from C
+07:33:54 http=200 body=env  GREETING    = "Hello from C
+07:33:54 http=200 body=env  GREETING    = "Hello from C
+07:33:54 http=200 body=env  GREETING    = "Hello from C
+07:33:55 http=200 body=env  GREETING    = "Hello from C
+07:33:55 http=200 body=env  GREETING    = "Hello from C
+07:33:55 http=200 body=env  GREETING    = "Hello from C
+07:33:55 http=200 body=env  GREETING    = "Hello from C
+07:33:55 http=200 body=env  GREETING    = "Hello from C
+07:33:56 http=200 body=env  GREETING    = "Hello from C
+07:33:56 http=200 body=env  GREETING    = "Hello from C
+07:33:56 http=200 body=env  GREETING    = "Hello from C
+07:33:56 http=200 body=env  GREETING    = "Hello from C
+07:33:56 http=200 body=env  GREETING    = "Hello from C
+07:33:57 http=200 body=env  GREETING    = "Hello from C
+07:33:57 http=200 body=env  GREETING    = "Hello from C
+07:33:57 http=200 body=env  GREETING    = "Hello from C
+07:33:57 http=200 body=env  GREETING    = "Hello from C
+07:33:58 http=200 body=env  GREETING    = "Hello from C
+07:33:58 http=200 body=env  GREETING    = "Hello from C
+07:33:58 http=200 body=env  GREETING    = "Hello from C
+07:33:58 http=200 body=env  GREETING    = "Hello from C
+07:33:58 http=200 body=env  GREETING    = "Hello from C
+07:33:59 http=200 body=env  GREETING    = "Hello from C
+07:33:59 http=200 body=env  GREETING    = "Hello from C
+07:33:59 http=200 body=env  GREETING    = "Hello from C
+07:33:59 http=200 body=env  GREETING    = "Hello from C
+07:33:59 http=200 body=env  GREETING    = "Hello from C
+07:34:00 http=200 body=env  GREETING    = "Hello from C
+07:34:00 http=200 body=env  GREETING    = "Hello from C
+07:34:00 http=200 body=env  GREETING    = "Hello from C
+07:34:00 http=200 body=env  GREETING    = "Hello from C
+07:34:01 http=200 body=env  GREETING    = "Hello from C
+07:34:01 http=200 body=env  GREETING    = "Hello from C
+07:34:01 http=200 body=env  GREETING    = "Hello from C
+07:34:01 http=200 body=env  GREETING    = "Hello from C
+07:34:01 http=200 body=env  GREETING    = "Hello from C
+07:34:02 http=200 body=env  GREETING    = "Hello from C
+07:34:02 http=200 body=env  GREETING    = "Hello from C
+07:34:02 http=200 body=env  GREETING    = "Hello from C
+07:34:02 http=200 body=env  GREETING    = "Hello from C
+07:34:02 http=200 body=env  GREETING    = "Hello from C
+07:34:03 http=200 body=env  GREETING    = "Hello from C
+07:34:03 http=200 body=env  GREETING    = "Hello from C
+07:34:03 http=200 body=env  GREETING    = "Hello from C
+07:34:03 http=200 body=env  GREETING    = "Hello from C
+07:34:03 http=200 body=env  GREETING    = "Hello from C
+07:34:04 http=200 body=env  GREETING    = "Hello from C
+07:34:04 http=200 body=env  GREETING    = "Hello from C
+07:34:04 http=200 body=env  GREETING    = "Hello from C
+07:34:04 http=200 body=env  GREETING    = "Hello from C
+07:34:05 http=200 body=env  GREETING    = "Hello from C
+07:34:05 http=200 body=env  GREETING    = "Hello from C
+07:34:05 http=200 body=env  GREETING    = "Hello from C
+07:34:05 http=200 body=env  GREETING    = "Hello from C
+07:34:05 http=200 body=env  GREETING    = "Hello from C
+07:34:06 http=200 body=env  GREETING    = "Hello from C
+07:34:06 http=200 body=env  GREETING    = "Hello from C
+07:34:06 http=200 body=env  GREETING    = "Hello from C
+07:34:06 http=200 body=env  GREETING    = "Hello from C
+07:34:06 http=200 body=env  GREETING    = "Hello from C
+07:34:07 http=200 body=env  GREETING    = "Hello from C
+07:34:07 http=200 body=env  GREETING    = "Hello from C
+07:34:07 http=200 body=env  GREETING    = "Hello from C
+07:34:07 http=200 body=env  GREETING    = "Hello from C
+07:34:08 http=200 body=env  GREETING    = "Hello from C
+07:34:08 http=200 body=env  GREETING    = "Hello from C
+07:34:08 http=200 body=env  GREETING    = "Hello from C
+07:34:08 http=200 body=env  GREETING    = "Hello from C
+07:34:08 http=200 body=env  GREETING    = "Hello from C
+07:34:09 http=200 body=env  GREETING    = "Hello from C
+07:34:09 http=200 body=env  GREETING    = "Hello from C
+07:34:09 http=200 body=env  GREETING    = "Hello from C
+07:34:09 http=200 body=env  GREETING    = "Hello from C
+07:34:09 http=200 body=env  GREETING    = "Hello from C
+07:34:10 http=200 body=env  GREETING    = "Hello from C
+07:34:10 http=200 body=env  GREETING    = "Hello from C
+07:34:10 http=200 body=env  GREETING    = "Hello from C
+07:34:10 http=200 body=env  GREETING    = "Hello from C
+07:34:11 http=200 body=env  GREETING    = "Hello from C
+07:34:11 http=200 body=env  GREETING    = "Hello from C
+07:34:11 http=200 body=env  GREETING    = "Hello from C
+07:34:11 http=200 body=env  GREETING    = "Hello from C
+07:34:11 http=200 body=env  GREETING    = "Hello from C
+07:34:12 http=200 body=env  GREETING    = "Hello from C
+07:34:12 http=200 body=env  GREETING    = "Hello from C
+07:34:12 http=200 body=env  GREETING    = "Hello from C
+07:34:12 http=200 body=env  GREETING    = "Hello from C
+07:34:12 http=200 body=env  GREETING    = "Hello from C
+07:34:13 http=200 body=env  GREETING    = "Hello from C
+07:34:13 http=200 body=env  GREETING    = "Hello from C
+07:34:13 http=200 body=env  GREETING    = "Hello from C
+07:34:13 http=200 body=env  GREETING    = "Hello from C
+07:34:13 http=200 body=env  GREETING    = "Hello from C
+07:34:14 http=200 body=env  GREETING    = "Hello from C
+07:34:14 http=200 body=env  GREETING    = "Hello from C
+07:34:14 http=200 body=env  GREETING    = "Hello from C
+07:34:14 http=200 body=env  GREETING    = "Hello from C
+07:34:15 http=200 body=env  GREETING    = "Hello from C
+07:34:15 http=200 body=env  GREETING    = "Hello from C
+07:34:15 http=200 body=env  GREETING    = "Hello from C
+07:34:15 http=200 body=env  GREETING    = "Hello from C
+07:34:15 http=200 body=env  GREETING    = "Hello from C
+07:34:16 http=200 body=env  GREETING    = "Hello from C
+07:34:16 http=200 body=env  GREETING    = "Hello from C
+07:34:16 http=200 body=env  GREETING    = "Hello from C
+07:34:16 http=200 body=env  GREETING    = "Hello from C
+07:34:16 http=200 body=env  GREETING    = "Hello from C
+07:34:17 http=200 body=env  GREETING    = "Hello from C
+07:34:17 http=200 body=env  GREETING    = "Hello from C
+07:34:17 http=200 body=env  GREETING    = "Hello from C
+07:34:17 http=200 body=env  GREETING    = "Hello from C
+07:34:18 http=200 body=env  GREETING    = "Hello from C
+07:34:18 http=200 body=env  GREETING    = "Hello from C
+07:34:18 http=200 body=env  GREETING    = "Hello from C
+07:34:18 http=200 body=env  GREETING    = "Hello from C
+07:34:18 http=200 body=env  GREETING    = "Hello from C
+07:34:19 http=200 body=env  GREETING    = "Hello from C
+07:34:19 http=200 body=env  GREETING    = "Hello from C
+07:34:19 http=200 body=env  GREETING    = "Hello from C
+07:34:19 http=200 body=env  GREETING    = "Hello from C
+07:34:19 http=200 body=env  GREETING    = "Hello from C
+07:34:20 http=200 body=env  GREETING    = "Hello from C
+07:34:20 http=200 body=env  GREETING    = "Hello from C
+07:34:20 http=200 body=env  GREETING    = "Hello from C
+07:34:20 http=200 body=env  GREETING    = "Hello from C
+07:34:21 http=200 body=env  GREETING    = "Hello from C
+07:34:21 http=200 body=env  GREETING    = "Hello from C
+07:34:21 http=200 body=env  GREETING    = "Hello from C
+07:34:21 http=200 body=env  GREETING    = "Hello from C
+07:34:21 http=200 body=env  GREETING    = "Hello from C
+07:34:22 http=200 body=env  GREETING    = "Hello from C
+07:34:22 http=200 body=env  GREETING    = "Hello from C
+07:34:22 http=200 body=env  GREETING    = "Hello from C
+07:34:22 http=200 body=env  GREETING    = "Hello from C
+07:34:22 http=200 body=env  GREETING    = "Hello from C
+07:34:23 http=200 body=env  GREETING    = "Hello from C
+07:34:23 http=200 body=env  GREETING    = "Hello from C
+07:34:23 http=200 body=env  GREETING    = "Hello from C
+07:34:23 http=200 body=env  GREETING    = "Hello from C
+07:34:24 http=200 body=env  GREETING    = "Hello from C
+07:34:24 http=200 body=env  GREETING    = "Hello from C
+07:34:24 http=200 body=env  GREETING    = "Hello from C
+07:34:24 http=200 body=env  GREETING    = "Hello from C
+07:34:24 http=200 body=env  GREETING    = "Hello from C
+07:34:25 http=200 body=env  GREETING    = "Hello from C
+07:34:25 http=200 body=env  GREETING    = "Hello from C
+07:34:25 http=200 body=env  GREETING    = "Hello from C
+07:34:25 http=200 body=env  GREETING    = "Hello from C
+07:34:25 http=200 body=env  GREETING    = "Hello from C
+07:34:26 http=200 body=env  GREETING    = "Hello from C
+07:34:26 http=200 body=env  GREETING    = "Hello from C
+07:34:26 http=200 body=env  GREETING    = "Hello from C
+07:34:26 http=200 body=env  GREETING    = "Hello from C
+07:34:26 http=200 body=env  GREETING    = "Hello from C
+07:34:27 http=200 body=env  GREETING    = "Hello from C
+07:34:27 http=200 body=env  GREETING    = "Hello from C
+07:34:27 http=200 body=env  GREETING    = "Hello from C
+07:34:27 http=200 body=env  GREETING    = "Hello from C
+07:34:28 http=200 body=env  GREETING    = "Hello from C
+07:34:28 http=200 body=env  GREETING    = "Hello from C
+07:34:28 http=200 body=env  GREETING    = "Hello from C
+07:34:28 http=200 body=env  GREETING    = "Hello from C
+07:34:28 http=200 body=env  GREETING    = "Hello from C
+07:34:29 http=200 body=env  GREETING    = "Hello from C
+07:34:29 http=200 body=env  GREETING    = "Hello from C
+07:34:29 http=200 body=env  GREETING    = "Hello from C
+07:34:29 http=200 body=env  GREETING    = "Hello from C
+07:34:29 http=200 body=env  GREETING    = "Hello from C
+07:34:30 http=200 body=env  GREETING    = "Hello from C
+07:34:30 http=200 body=env  GREETING    = "Hello from C
+07:34:30 http=200 body=env  GREETING    = "Hello from C

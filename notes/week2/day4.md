@@ -1,6 +1,7 @@
 # Day 4 学习笔记 · 存活探针与就绪探针（让应用具备自动重启与自动摘除流量的能力）
 
 > 日期：2026-09-21 · 代码：`code/week2/day4/`（`deploy.liveness.yaml`、`deploy.readiness.yaml`、`deploy.startup.yaml`、`deploy.startup.noprobe.yaml`、`go-webapp/`、`outputs/`）
+> 状态：**已提炼为归档**（2026-09-22）。复习时不需要通读本文件，只需阅读 `notes/week2/提炼-反例与关系.md`；本文件保留采集记录与逐字段解析，用于回查具体取值。
 > 配套资料：`plan/week2/任务明细.md` 中的 Day 4 节、`docs/k8s_in_action/02-Pod与副本机制.md` 的探针小节、教材第 4 章 4.1 节（p.155-161，存活探针）与第 5 章 5.5 节（p.247-253，就绪探针）
 > 起点资产：Deployment `webapp`（副本数量为 2、镜像 `webapp:v6`）、Service `webapp`（ClusterIP 为 `10.96.135.12`、选择器为 `app=webapp`）、ConfigMap `webapp-config`、Secret `webapp-secret`
 > 今日的模型变化：Pod 模板中的容器段落里新增了两个检查字段，也就是 `livenessProbe` 与 `readinessProbe`。应用本身没有改动它的业务逻辑，改动只在于新增了 `/healthz`、`/readyz`、`/state` 与 `/admin/fault` 四个端点，其中前两个端点分别供两种探针调用。

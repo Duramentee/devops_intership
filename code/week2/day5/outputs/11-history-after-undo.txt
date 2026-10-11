@@ -1,0 +1,15 @@
+# 步骤 11：回滚之后的版本历史
+# 记录时刻（UTC）：2026-09-22T07:29:31Z
+
+deployment.apps/webapp 
+REVISION  CHANGE-CAUSE
+6         <none>
+7         <none>
+9         <none>
+10        <none>
+14        <none>
+15        <none>
+
+
+revision=15
+generation=19

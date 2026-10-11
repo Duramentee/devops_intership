@@ -1,0 +1,51 @@
+# 步骤 16：收尾，把 Deployment 恢复成滚动升级并记录最终状态
+# 记录时刻（UTC）：2026-09-22T07:34:45Z
+# 本次的恢复动作是在选做步骤 17 中通过 apply deploy.rollout.yaml 完成的，
+# 它同时把策略写回 RollingUpdate、把镜像写回 webapp:v7，随后在步骤 18 恢复升级。
+
+===== Deployment 的最终状态 =====
+image=webapp:v7
+strategy=RollingUpdate
+maxSurge=1
+maxUnavailable=0
+replicas=2
+revisionHistoryLimit=5
+progressDeadlineSeconds=20
+minReadySeconds=
+paused=
+generation=28
+revision=22
+availableReplicas=2
+unavailableReplicas=
+--- Deployment、ReplicaSet、Pod 的整体状态 ---
+NAME                     READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES      SELECTOR
+deployment.apps/webapp   2/2     2            2           4d    webapp       webapp:v7   app=webapp
+
+NAME                                DESIRED   CURRENT   READY   AGE     CONTAINERS   IMAGES                  SELECTOR
+replicaset.apps/webapp-54c66c8c74   2         2         2       26m     webapp       webapp:v7               app=webapp,pod-template-hash=54c66c8c74
+replicaset.apps/webapp-5bd67f6c57   0         0         0       22h     webapp       webapp:v6               app=webapp,pod-template-hash=5bd67f6c57
+replicaset.apps/webapp-679979b5d6   0         0         0       3m59s   webapp       webapp:does-not-exist   app=webapp,pod-template-hash=679979b5d6
+replicaset.apps/webapp-7f78498c55   0         0         0       22h     webapp       webapp:v6               app=webapp,pod-template-hash=7f78498c55
+replicaset.apps/webapp-7f9d7cc67    0         0         0       22h     webapp       webapp:v6               app=webapp,pod-template-hash=7f9d7cc67
+replicaset.apps/webapp-f9856cb66    0         0         0       21h     webapp       webapp:v6               app=webapp,pod-template-hash=f9856cb66
+
+NAME                          READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+pod/curl-loop                 1/1     Running   0          73s   10.244.0.30   kind-control-plane   <none>           <none>
+pod/webapp-54c66c8c74-kd4gx   1/1     Running   0          14s   10.244.0.33   kind-control-plane   <none>           <none>
+pod/webapp-54c66c8c74-pmc4c   1/1     Running   0          8s    10.244.0.34   kind-control-plane   <none>           <none>
+--- 版本历史 ---
+deployment.apps/webapp 
+REVISION  CHANGE-CAUSE
+7         <none>
+9         <none>
+10        <none>
+19        <none>
+21        <none>
+22        <none>
+
+--- 服务与端点 ---
+NAME     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE     SELECTOR
+webapp   ClusterIP   10.96.135.12   <none>        8080/TCP   2d23h   app=webapp
+Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
+NAME     ENDPOINTS                           AGE
+webapp   10.244.0.33:8080,10.244.0.34:8080   2d23h

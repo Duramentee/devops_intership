@@ -1,0 +1,91 @@
+# 滚动升级与回滚实验使用的 Deployment 骨架：把每一处尖括号替换成正确的取值，
+# 然后另存为 deploy.rollout.yaml。
+#
+# 填写之前请依次确认下面九件事：
+#
+# 1. 填写完成之后，文件里不允许再出现尖括号。
+#
+# 2. 这份清单就地更新 Deployment webapp，因此 metadata.name 必须保持不变，
+#    容器段落里的探针、配置来源与端口也必须与 Day 4 的清单保持一致。
+#    今天要观察的对象是「Pod 模板发生变化之后控制器如何替换 Pod」，
+#    如果同时改动探针或者配置来源，观察到的现象就无法归因到滚动升级这一件事上。
+#
+# 3. 本次要新增的第一个字段是 spec.strategy，它有两个可选取值：
+#    RollingUpdate 表示渐进替换（默认取值），Recreate 表示先把旧 Pod 全部删除再创建新 Pod。
+#    今天先用 RollingUpdate，Recreate 只在对照实验中使用。
+#
+# 4. 本次要新增的第二个字段是 spec.strategy.rollingUpdate.maxSurge，
+#    它表示在期望副本数量之外最多可以多创建多少个 Pod。
+#    取值可以是绝对个数，也可以是百分数；取百分数时由控制平面向上取整。
+#
+# 5. 本次要新增的第三个字段是 spec.strategy.rollingUpdate.maxUnavailable，
+#    它表示在升级过程中最多允许多少个 Pod 处于不可用状态。
+#    取百分数时由控制平面向下取整，并且它与 maxSurge 不允许同时为 0。
+#
+# 6. 本次要新增的第四个字段是 spec.minReadySeconds，
+#    它表示一个新 Pod 进入就绪状态之后还必须连续成功运行多少秒，才被计入「可用」。
+#    这个字段的取值会直接决定升级推进的速度，因此第一次实验把它留空也就是不写。
+#
+# 7. 本次要新增的第五个字段是 spec.revisionHistoryLimit，
+#    它表示 Deployment 最多保留多少个旧 ReplicaSet 作为历史版本，默认取值是 2。
+#    今天至少要经历「升级一次、回滚一次、再制造一次失败的升级」三步，
+#    因此这个字段必须填一个不小于 3 的取值，否则第一步产生的 ReplicaSet 会被控制器清理掉，回滚时无法选择到它。
+#
+# 8. 本次要新增的第六个字段是 spec.progressDeadlineSeconds，
+#    它表示升级过程被卡住多少秒之后，Deployment 的 Progressing 条件被写成 False。
+#    这个字段只影响状态的报告，控制器不会因为超过它而自动回滚。
+#
+# 9. 容器段落里的 image 字段在第一次 apply 时仍然写 webapp:v6，
+#    等到确认「只修改 strategy 不会创建新的 ReplicaSet」之后再把它改成 webapp:v7。
+#    这样安排的原因是把一次变更拆成两次 apply，每次只有一个自变量发生变化：
+#    第一次只改策略字段，第二次只改镜像标签，「新 ReplicaSet 由谁触发」这个问题才能得到一个明确的答案。
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp
+  labels:
+    app: webapp
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 20
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: webapp
+  template:
+    metadata:
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+        - name: webapp
+          image: webapp:v7
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: webapp-config
+            - secretRef:
+                name: webapp-secret
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            timeoutSeconds: 1
+            failureThreshold: 3

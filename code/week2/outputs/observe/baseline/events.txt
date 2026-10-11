@@ -1,0 +1,3 @@
+### kubectl get events --sort-by=.lastTimestamp -n default
+### 快照=baseline 时间=20260925-141328
+No resources found in default namespace.

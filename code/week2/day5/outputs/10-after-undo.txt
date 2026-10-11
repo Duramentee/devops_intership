@@ -1,0 +1,30 @@
+# 步骤 10：确认回滚之后的镜像、Pod 名称与地址、以及 /version 端点的实际返回
+# 记录时刻（UTC）：2026-09-22T07:29:29Z
+
+===== describe deploy webapp 的 Image 一行 =====
+Selector:               app=webapp
+Replicas:               2 desired | 2 updated | 2 total | 2 available | 0 unavailable
+StrategyType:           RollingUpdate
+
+===== 回滚之后的 Pod（名称与地址都与升级之前不同）=====
+NAME                      READY   STATUS    RESTARTS   AGE    IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          10m    10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-lx9cs   0/1     Error     0          2m4s   10.244.0.18   kind-control-plane   <none>           <none>
+webapp-7f78498c55-88kbg   1/1     Running   0          13s    10.244.0.20   kind-control-plane   <none>           <none>
+webapp-7f78498c55-94tvr   1/1     Running   0          7s     10.244.0.21   kind-control-plane   <none>           <none>
+
+===== 在容器内部请求 /version 端点 =====
+env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+
+===== 回滚之后的 ReplicaSet（原来缩容到 0 的那个重新扩容）=====
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   14    webapp:v7   0
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   15    webapp:v6   2
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0

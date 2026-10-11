@@ -1,0 +1,3 @@
+# 记录时刻（UTC）：2026-09-22T07:25:42Z
+# 命令：docker exec kind-control-plane crictl images，然后筛选名称包含 curl 的行
+docker.io/curlimages/curl                       8.10.1               fb8656c965b90       9.41MB

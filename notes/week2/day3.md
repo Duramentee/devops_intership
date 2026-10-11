@@ -1,6 +1,7 @@
 # Day 3 学习笔记 · ConfigMap 与 Secret（把配置从镜像中分离）
 
 > 日期：2026-09-21 · 代码：`code/week2/day3/`（`cm.yaml`、`secret.yaml`、`deploy.env.yaml`、`deploy.volume.yaml`、`go-webapp/`、`outputs/`）
+> 状态：**已提炼为归档**（2026-09-22）。复习时不需要通读本文件，只需阅读 `notes/week2/提炼-反例与关系.md`；本文件保留采集记录与逐字段解析，用于回查具体取值。
 > 配套资料：`plan/week2/任务明细.md` 中的 Day 3 节、`docs/k8s_in_action/04-配置与API.md`、教材第 7 章 7.4 至 7.5 节（p.323-357）
 > 起点资产：Day 1 创建的 Deployment `webapp`（副本数量为 3）、Day 2 创建的 Service `webapp`（ClusterIP 为 `10.96.135.12`）、镜像 `webapp:v4`
 > 今日的模型变化：Pod 模板中除「镜像与端口」之外新增两类引用，也就是对 ConfigMap 的引用与对 Secret 的引用。配置文件不再位于镜像内部，而是在容器创建之前由节点上的 kubelet 依据这些引用写入容器

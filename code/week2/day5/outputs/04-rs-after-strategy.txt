@@ -1,0 +1,107 @@
+NAME                DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES      SELECTOR
+webapp-5bd67f6c57   0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=5bd67f6c57
+webapp-654bfc4f58   0         0         0       24h   webapp       webapp:v5   app=webapp,pod-template-hash=654bfc4f58
+webapp-77c846c8d8   0         0         0       46h   webapp       webapp:v5   app=webapp,pod-template-hash=77c846c8d8
+webapp-7944f66797   0         0         0       46h   webapp       webapp:v5   app=webapp,pod-template-hash=7944f66797
+webapp-7dbcc8ff4b   0         0         0       4d    webapp       webapp:v4   app=webapp,pod-template-hash=7dbcc8ff4b
+webapp-7f78498c55   1         1         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f78498c55
+webapp-7f9d7cc67    0         0         0       22h   webapp       webapp:v6   app=webapp,pod-template-hash=7f9d7cc67
+webapp-855d94f5b8   0         0         0       47h   webapp       webapp:v5   app=webapp,pod-template-hash=855d94f5b8
+webapp-f9856cb66    2         2         2       21h   webapp       webapp:v6   app=webapp,pod-template-hash=f9856cb66
+webapp-fd874688f    0         0         0       23h   webapp       webapp:v6   app=webapp,pod-template-hash=fd874688f
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "11"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"webapp"},"name":"webapp","namespace":"default"},"spec":{"progressDeadlineSeconds":20,"replicas":2,"revisionHistoryLimit":5,"selector":{"matchLabels":{"app":"webapp"}},"strategy":{"rollingUpdate":{"maxSurge":1,"maxUnavailable":0},"type":"RollingUpdate"},"template":{"metadata":{"labels":{"app":"webapp","env":"dev"}},"spec":{"containers":[{"envFrom":[{"configMapRef":{"name":"webapp-config"}},{"secretRef":{"name":"webapp-secret"}}],"image":"webapp:v6","livenessProbe":{"failureThreshold":3,"httpGet":{"path":"/healthz","port":8080},"initialDelaySeconds":5,"periodSeconds":5,"timeoutSeconds":1},"name":"webapp","ports":[{"containerPort":8080}],"readinessProbe":{"failureThreshold":3,"httpGet":{"path":"/readyz","port":8080},"initialDelaySeconds":2,"periodSeconds":5,"timeoutSeconds":1}}]}}}}
+  creationTimestamp: "2026-09-18T06:35:46Z"
+  generation: 13
+  labels:
+    app: webapp
+  name: webapp
+  namespace: default
+  resourceVersion: "472643"
+  uid: 7b58d36b-ebc3-4165-96a2-03e0dcd13bcd
+spec:
+  progressDeadlineSeconds: 20
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: webapp
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-09-21T14:54:37+08:00"
+      labels:
+        app: webapp
+        env: dev
+    spec:
+      containers:
+      - envFrom:
+        - configMapRef:
+            name: webapp-config
+        - secretRef:
+            name: webapp-secret
+        image: webapp:v6
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: webapp
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /readyz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 2
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 2
+  conditions:
+  - lastTransitionTime: "2026-09-22T00:26:31Z"
+    lastUpdateTime: "2026-09-22T00:26:31Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2026-09-21T09:43:34Z"
+    lastUpdateTime: "2026-09-22T07:01:46Z"
+    message: ReplicaSet "webapp-7f78498c55" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 13
+  readyReplicas: 2
+  replicas: 3
+  terminatingReplicas: 0
+  unavailableReplicas: 1
+  updatedReplicas: 1

@@ -1,0 +1,32 @@
+# 步骤 14：从失败的升级中恢复
+# 记录时刻（UTC）：2026-09-22T07:31:09Z
+
+===== 执行回滚 =====
+Warning: resource deployments/webapp was previously managed with 'kubectl apply'. Rolling back will not update the kubectl.kubernetes.io/last-applied-configuration annotation, which may cause unexpected behavior on future 'kubectl apply' operations. Consider using 'kubectl apply' with your previous configuration file instead.
+deployment.apps/webapp rolled back
+
+===== 升级过程 =====
+deployment "webapp" successfully rolled out
+
+===== 恢复之后 =====
+image=webapp:v7
+revision=20
+generation=24
+NAME                      READY   STATUS        RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running       0          12m   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-6rkzf   1/1     Running       0          45s   10.244.0.27   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-fj9zg   1/1     Running       0          52s   10.244.0.26   kind-control-plane   <none>           <none>
+webapp-679979b5d6-jxdj5   0/1     Terminating   0          23s   10.244.0.28   kind-control-plane   <none>           <none>
+--- Deployment 的 status 条件 ---
+Available=True reason=MinimumReplicasAvailable
+Progressing=True reason=NewReplicaSetAvailable
+--- 版本历史 ---
+deployment.apps/webapp 
+REVISION  CHANGE-CAUSE
+7         <none>
+9         <none>
+10        <none>
+17        <none>
+19        <none>
+20        <none>
+

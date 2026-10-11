@@ -1,0 +1,63 @@
+# 本地联调使用的 Docker Compose 清单。
+#
+# 本文件的用途有两个阶段：
+#   阶段 1（现在）：只启动 postgres 与 redis 两个依赖服务，后端在宿主机上用 go run 运行。
+#   阶段 3（之后）：把 api 与 web 两个服务也加进来，四个组件一起运行，为第 4 阶段的 Kubernetes 清单提供对照。
+#
+# 与 Kubernetes 清单的对应关系（这份对照关系是你理解「Compose 与 K8s 的差异」的入口）：
+#   compose 中的 services 与 k8s 中的 Deployment 或 StatefulSet 对应；
+#   compose 中的 volumes 与 k8s 中的 PersistentVolumeClaim 对应；
+#   compose 中的 environment 与 k8s 中的 ConfigMap 与 Secret 对应；
+#   compose 中的 ports 与 k8s 中的 Service 对应；
+#   compose 中的 healthcheck 与 k8s 中的探针对应；
+#   compose 中的 depends_on 在 k8s 中没有等价的字段，因为 Kubernetes 依靠探针与重试来收敛，而不是依靠启动顺序。
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shortener-postgres
+    environment:
+      POSTGRES_USER: shortener
+      POSTGRES_PASSWORD: shortener_dev_password
+      POSTGRES_DB: shortener
+      # 下面这一行让容器在初始化时使用与宿主机一致的排序规则，
+      # 避免在不同机器上出现「排序结果不一致」这种难以排查的问题。
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      # 宿主机端口 5432 映射到容器端口 5432，供阶段 1 与阶段 2 中的后端直接连接。
+      - "5432:5432"
+    volumes:
+      # 具名卷，由 Docker 管理实际存放位置；这一步对应 Kubernetes 中的 VolumeClaimTemplates。
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # 使用 pg_isready 判断数据库是否已经可以接受连接。
+      # 注意 -U 后面必须写成容器内部能够识别的用户名，而不是宿主机的用户名。
+      test: ["CMD-SHELL", "pg_isready -U shortener -d shortener"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: shortener-redis
+    command:
+      # appendonly yes 打开 AOF 持久化，使容器重启之后缓存键仍然存在。
+      # 对缓存而言这一步并非必须，加上它的目的是让阶段 6 的排障实验有一条确定的基线。
+      - redis-server
+      - --appendonly
+      - "yes"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:

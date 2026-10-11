@@ -1,0 +1,64 @@
+# 步骤 13：制造一次失败的升级（镜像标签指向一个不存在的版本）
+# 记录时刻（UTC）：2026-09-22T07:30:46Z
+# 客户端日志在本步骤开始之前的行数：5487
+
+===== 变更之前 =====
+image=webapp:v7
+revision=18
+progressDeadlineSeconds=20
+maxUnavailable=0
+
+===== 执行 kubectl set image =====
+deployment.apps/webapp image updated
+
+===== kubectl rollout status deploy/webapp --timeout=30s 的输出与退出码 =====
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+error: deployment "webapp" exceeded its progress deadline
+退出码=1
+
+===== 失败升级期间的 Pod =====
+NAME                      READY   STATUS             RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running            0          12m   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-6rkzf   1/1     Running            0          43s   10.244.0.27   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-fj9zg   1/1     Running            0          50s   10.244.0.26   kind-control-plane   <none>           <none>
+webapp-679979b5d6-jxdj5   0/1     ImagePullBackOff   0          21s   10.244.0.28   kind-control-plane   <none>           <none>
+
+===== 新 Pod 的名称 =====
+webapp-679979b5d6-jxdj5
+
+===== 新 Pod 的 describe 输出（末尾 20 行）=====
+Volumes:
+  kube-api-access-4k7bk:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  3607
+    ConfigMapName:           kube-root-ca.crt
+    Optional:                false
+    DownwardAPI:             true
+QoS Class:                   BestEffort
+Node-Selectors:              <none>
+Tolerations:                 node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                             node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+Events:
+  Type     Reason     Age               From               Message
+  ----     ------     ----              ----               -------
+  Normal   Scheduled  21s               default-scheduler  Successfully assigned default/webapp-679979b5d6-jxdj5 to kind-control-plane
+  Normal   BackOff    20s               kubelet            spec.containers{webapp}: Back-off pulling image "webapp:does-not-exist"
+  Warning  Failed     20s               kubelet            spec.containers{webapp}: Error: ImagePullBackOff
+  Normal   Pulling    6s (x2 over 20s)  kubelet            spec.containers{webapp}: Pulling image "webapp:does-not-exist"
+  Warning  Failed     5s (x2 over 20s)  kubelet            spec.containers{webapp}: Failed to pull image "webapp:does-not-exist": failed to pull and unpack image "docker.io/library/webapp:does-not-exist": failed to resolve reference "docker.io/library/webapp:does-not-exist": failed to do request: Head "https://registry-1.docker.io/v2/library/webapp/manifests/does-not-exist": proxyconnect tcp: dial tcp 127.0.0.1:9674: connect: connection refused
+  Warning  Failed     5s (x2 over 20s)  kubelet            spec.containers{webapp}: Error: ErrImagePull
+
+===== Deployment 的 status 条件 =====
+Available=True reason=MinimumReplicasAvailable message=Deployment has minimum availability.
+Progressing=False reason=ProgressDeadlineExceeded message=ReplicaSet "webapp-679979b5d6" has timed out progressing.
+replicas=3
+unavailableReplicas=1
+availableReplicas=2
+
+===== 客户端最近的请求行（升级被阻止期间服务仍然可用）=====
+07:31:09 http=200 body=version=v7
+07:31:08 http=200 body=version=v7
+07:31:08 http=200 body=version=v7
+07:31:09 http=200 body=version=v7
+07:31:09 http=200 body=version=v7
+07:31:09 http=200 body=version=v7

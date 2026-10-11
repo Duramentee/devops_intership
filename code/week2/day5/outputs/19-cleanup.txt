@@ -1,0 +1,7 @@
+# 收尾：删除持续访问客户端脚本使用的 Pod
+# 记录时刻（UTC）：2026-09-22T07:34:46Z
+pod "curl-loop" deleted from default namespace
+--- 集群中剩下的 Pod ---
+NAME                      READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+webapp-54c66c8c74-kd4gx   1/1     Running   0          46s   10.244.0.33   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-pmc4c   1/1     Running   0          40s   10.244.0.34   kind-control-plane   <none>           <none>

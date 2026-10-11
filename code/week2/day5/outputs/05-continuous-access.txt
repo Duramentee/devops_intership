@@ -1,0 +1,365 @@
+# 连续访问记录（原始输出：客户端 Pod curl-loop 的容器日志，导出命令 kubectl logs curl-loop）
+# 客户端镜像：curlimages/curl:8.10.1（该镜像在节点镜像库中由宿主机导入）
+# 客户端启动时刻：2026-09-22T07:18:51Z（UTC，与容器内 date 命令的时区一致）
+# 请求地址：http://webapp:8080/version，间隔 0.2 秒，单次超时 2 秒
+# 日志总行数：5723
+#
+# 判别标记（这一节是本次实验的关键，与最初的预期不同）：
+#   body=version=v7 …… 响应来自 webapp:v7。v7 带有 /version 端点，正文只有一行 version=v7。
+#   body=env …… 响应来自 webapp:v6。v6 没有 /version 端点，该请求落到根路径处理器 "/"，
+#                      返回的是配置来源报告，正文有多行，第一行形如 env  GREETING    = ...
+#                      因此它的状态码是 200 而不是 404。
+#   http=000 ………… 连接未能建立。此时 body= 后面显示的是上一次请求留下的残留内容，不可作为判断依据。
+#
+# 各窗口的边界行号（由每一步执行前后调用 kubectl logs curl-loop | wc -l 得到）：
+#   行 1 到 2042            准备期，Deployment 使用 webapp:v7
+#   行 2043 到 2155            把镜像换成 webapp:v6 的替换窗口
+#   行 2156 到 3605            webapp:v6 稳定运行
+#   行 3606 到 3835            步骤 6：升级到 webapp:v7
+#   行 3836 到 4279            webapp:v7 稳定运行
+#   行 4280 到 4362            步骤 9：回滚到 webapp:v6
+#   行 4363 到 4982            webapp:v6 稳定运行
+#   行 4983 到 5167            步骤 12 组合二：maxSurge=0 maxUnavailable=1，升级到 webapp:v7
+#   行 5169 到 5203            步骤 12 组合三：maxSurge=100% maxUnavailable=0，降级到 webapp:v6
+#   行 5204 到 5417           恢复标准组合并升级到 webapp:v7
+#   行 5418 到 5595          步骤 13：失败的升级
+#   行 5596 到 5603          步骤 14：从失败的升级中恢复
+
+======================================== 统计表 ========================================
+窗口                                         | 行区间 | 请求数 | http=000 | v7应答  | v6应答
+准备期（webapp:v7 稳定）                | 1-2042   | 2042      | 0        | 2042      | 0       
+换成 webapp:v6 的替换窗口               | 2043-2155 | 57        | 4        | 43        | 14      
+webapp:v6 稳定运行                         | 2156-3605 | 290       | 1        | 0         | 290     
+步骤 6 升级到 webapp:v7                   | 3606-3835 | 54        | 2        | 10        | 44      
+webapp:v7 稳定运行                         | 3836-4279 | 444       | 1        | 444       | 0       
+步骤 9 回滚到 webapp:v6                   | 4280-4362 | 55        | 2        | 48        | 7       
+webapp:v6 稳定运行                         | 4363-4982 | 124       | 1        | 0         | 124     
+步骤 12 组合二 maxSurge=0 maxUnavailable=1 | 4983-5167 | 41        | 4        | 5         | 36      
+步骤 12 组合三 maxSurge=100% maxUnavailable=0 | 5169-5203 | 35        | 2        | 35        | 0       
+恢复标准组合并升级到 webapp:v7       | 5204-5417 | 58        | 2        | 19        | 39      
+步骤 13 失败的升级                      | 5418-5595 | 178       | 0        | 178       | 0       
+步骤 14 从失败的升级中恢复          | 5596-5603 | 8         | 0        | 8         | 0       
+
+==================================== 步骤 6 升级窗口的完整日志 ====================================
+07:27:26 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:26 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:26 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:28 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:28 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:28 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:28 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:31 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:31 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:31 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:31 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:32 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:32 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:32 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:32 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:32 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:33 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:33 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:33 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:33 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:34 http=200 body=version=v7
+07:27:34 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:34 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:34 http=000 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:36 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:37 http=200 body=version=v7
+07:27:37 http=200 body=version=v7
+07:27:37 http=200 body=version=v7
+07:27:37 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:37 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:38 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:38 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:38 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:27:38 http=200 body=version=v7
+07:27:38 http=200 body=version=v7
+07:27:39 http=200 body=version=v7
+07:27:39 http=200 body=version=v7
+07:27:39 http=000 body=version=v7
+07:27:39 http=200 body=version=v7
+
+==================================== 步骤 9 回滚窗口的完整日志 ====================================
+07:29:16 http=200 body=version=v7
+07:29:16 http=200 body=version=v7
+07:29:17 http=200 body=version=v7
+07:29:17 http=200 body=version=v7
+07:29:17 http=200 body=version=v7
+07:29:17 http=200 body=version=v7
+07:29:18 http=200 body=version=v7
+07:29:18 http=200 body=version=v7
+07:29:18 http=200 body=version=v7
+07:29:18 http=200 body=version=v7
+07:29:18 http=200 body=version=v7
+07:29:19 http=200 body=version=v7
+07:29:19 http=200 body=version=v7
+07:29:19 http=200 body=version=v7
+07:29:19 http=200 body=version=v7
+07:29:19 http=200 body=version=v7
+07:29:20 http=200 body=version=v7
+07:29:20 http=200 body=version=v7
+07:29:20 http=200 body=version=v7
+07:29:20 http=200 body=version=v7
+07:29:21 http=200 body=version=v7
+07:29:21 http=200 body=version=v7
+07:29:21 http=200 body=version=v7
+07:29:21 http=200 body=version=v7
+07:29:21 http=200 body=version=v7
+07:29:22 http=200 body=version=v7
+07:29:22 http=200 body=version=v7
+07:29:22 http=200 body=version=v7
+07:29:22 http=200 body=version=v7
+07:29:22 http=200 body=version=v7
+07:29:23 http=200 body=version=v7
+07:29:23 http=200 body=version=v7
+07:29:23 http=200 body=version=v7
+07:29:23 http=200 body=version=v7
+07:29:24 http=200 body=version=v7
+07:29:24 http=000 body=version=v7
+07:29:26 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:26 http=200 body=version=v7
+07:29:26 http=200 body=version=v7
+07:29:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:27 http=200 body=version=v7
+07:29:27 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:27 http=200 body=version=v7
+07:29:28 http=200 body=version=v7
+07:29:28 http=200 body=version=v7
+07:29:28 http=200 body=version=v7
+07:29:28 http=200 body=version=v7
+07:29:29 http=200 body=version=v7
+07:29:29 http=200 body=version=v7
+07:29:29 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:29 http=200 body=version=v7
+07:29:29 http=000 body=version=v7
+07:29:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+07:29:30 http=200 body=env  GREETING    = "Hello from ConfigMap"
+file GREETING    = <读取失败：open /etc/webapp/GREETING: no such file or directory>
+env  APP_ENV     = "dev"
+env  FOO-BAR     = "this-key-is-ignored"
+env  DB_PASSWORD = 已注入，长度=17
+
+==================================== 步骤 15 之前客户端日志的末尾 ====================================
+07:31:36 http=200 body=version=v7
+07:31:36 http=200 body=version=v7
+07:31:36 http=200 body=version=v7
+07:31:36 http=200 body=version=v7
+07:31:37 http=200 body=version=v7

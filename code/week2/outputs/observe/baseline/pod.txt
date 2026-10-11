@@ -1,0 +1,5 @@
+### kubectl get pod -o wide -n default
+### 快照=baseline 时间=20260925-141328
+NAME                      READY   STATUS    RESTARTS        AGE     IP           NODE                 NOMINATED NODE   READINESS GATES
+webapp-54c66c8c74-kd4gx   1/1     Running   5 (5h38m ago)   2d22h   10.244.0.3   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-pmc4c   1/1     Running   5 (5h38m ago)   2d22h   10.244.0.4   kind-control-plane   <none>           <none>

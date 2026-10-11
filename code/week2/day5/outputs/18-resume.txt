@@ -1,0 +1,29 @@
+# 选做步骤 18：恢复滚动升级
+# 记录时刻（UTC）：2026-09-22T07:34:32Z
+
+===== 执行 kubectl rollout resume deploy/webapp =====
+deployment.apps/webapp resumed
+
+===== 升级过程 =====
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+Waiting for deployment "webapp" rollout to finish: 1 old replicas are pending termination...
+deployment "webapp" successfully rolled out
+
+===== 恢复之后 =====
+paused= image=webapp:v7 strategy=RollingUpdate maxSurge=1 maxUnavailable=0 rev=22 generation=28
+NAME                REV   IMG                     DESIRED
+webapp-54c66c8c74   22    webapp:v7               2
+webapp-5bd67f6c57   9     webapp:v6               0
+webapp-679979b5d6   19    webapp:does-not-exist   0
+webapp-7f78498c55   21    webapp:v6               0
+webapp-7f9d7cc67    7     webapp:v6               0
+webapp-f9856cb66    10    webapp:v6               0
+NAME                      READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          72s   10.244.0.30   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-kd4gx   1/1     Running   0          13s   10.244.0.33   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-pmc4c   1/1     Running   0          7s    10.244.0.34   kind-control-plane   <none>           <none>
+webapp-7f78498c55-j2sh6   0/1     Error     0          69s   10.244.0.32   kind-control-plane   <none>           <none>

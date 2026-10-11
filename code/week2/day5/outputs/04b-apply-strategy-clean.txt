@@ -1,0 +1,52 @@
+# 步骤 4 的干净重做：只修改 spec.strategy.rollingUpdate.maxSurge，Pod 模板保持不变
+# 记录时刻（UTC）：2026-09-22T07:25:42Z
+
+===== 修改之前 =====
+--- ReplicaSet ---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   12    webapp:v7   2
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   11    webapp:v6   0
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+--- Pod ---
+NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          6m51s   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-6t8dr   1/1     Running   0          17m     10.244.0.11   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-v6cff   1/1     Running   0          17m     10.244.0.12   kind-control-plane   <none>           <none>
+--- Deployment 的计数与取值 ---
+generation=14
+revision=12
+maxSurge=1
+observedGeneration=14
+replicas=2
+availableReplicas=2
+
+===== 修改动作：patch maxSurge 由 1 改为 2 =====
+deployment.apps/webapp patched
+
+===== 修改之后（立即采集） =====
+generation=15
+revision=12
+maxSurge=2
+observedGeneration=15
+--- Pod（预期：没有任何 Pod 被替换，AGE 与名称都不变）---
+NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          6m52s   10.244.0.15   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-6t8dr   1/1     Running   0          17m     10.244.0.11   kind-control-plane   <none>           <none>
+webapp-54c66c8c74-v6cff   1/1     Running   0          17m     10.244.0.12   kind-control-plane   <none>           <none>
+--- ReplicaSet（预期：名称、revision 与 DESIRED 都不变）---
+NAME                REV   IMG         DESIRED
+webapp-54c66c8c74   12    webapp:v7   2
+webapp-5bd67f6c57   9     webapp:v6   0
+webapp-7f78498c55   11    webapp:v6   0
+webapp-7f9d7cc67    7     webapp:v6   0
+webapp-f9856cb66    10    webapp:v6   0
+webapp-fd874688f    6     webapp:v6   0
+
+===== 恢复原取值：patch maxSurge 回到 1 =====
+deployment.apps/webapp patched
+generation=16
+revision=12
+maxSurge=1

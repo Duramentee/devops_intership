@@ -1,0 +1,5 @@
+### kubectl get po --show-labels -n default
+### 快照=baseline 时间=20260925-141328
+NAME                      READY   STATUS    RESTARTS        AGE     LABELS
+webapp-54c66c8c74-kd4gx   1/1     Running   5 (5h38m ago)   2d22h   app=webapp,env=dev,pod-template-hash=54c66c8c74
+webapp-54c66c8c74-pmc4c   1/1     Running   5 (5h38m ago)   2d22h   app=webapp,env=dev,pod-template-hash=54c66c8c74

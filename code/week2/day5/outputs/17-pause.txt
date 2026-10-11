@@ -1,0 +1,26 @@
+# 选做步骤 17：暂停滚动升级（金丝雀发布的前半段）
+# 记录时刻（UTC）：2026-09-22T07:34:30Z
+
+===== 暂停之前 =====
+image=webapp:v6 strategy=Recreate paused= rev=21
+
+===== 执行 kubectl rollout pause deploy/webapp =====
+deployment.apps/webapp paused
+
+===== 暂停之后把镜像改为 webapp:v7 并 apply =====
+deployment.apps/webapp configured
+--- ReplicaSet（新 ReplicaSet 的 DESIRED 应当保持为 0）---
+NAME                REV   IMG                     DESIRED
+webapp-54c66c8c74   22    webapp:v7               0
+webapp-5bd67f6c57   9     webapp:v6               0
+webapp-679979b5d6   19    webapp:does-not-exist   0
+webapp-7f78498c55   21    webapp:v6               2
+webapp-7f9d7cc67    7     webapp:v6               0
+webapp-f9856cb66    10    webapp:v6               0
+--- Pod（仍然全部是 webapp:v6 的 Pod）---
+NAME                      READY   STATUS    RESTARTS   AGE   IP            NODE                 NOMINATED NODE   READINESS GATES
+curl-loop                 1/1     Running   0          59s   10.244.0.30   kind-control-plane   <none>           <none>
+webapp-7f78498c55-5q8tm   1/1     Running   0          56s   10.244.0.31   kind-control-plane   <none>           <none>
+webapp-7f78498c55-j2sh6   1/1     Running   0          56s   10.244.0.32   kind-control-plane   <none>           <none>
+--- Deployment 的 spec.paused 与 revision ---
+paused=true image=webapp:v7 rev=22 generation=27

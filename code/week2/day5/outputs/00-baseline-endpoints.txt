@@ -1,0 +1,5 @@
+NAME     TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE     SELECTOR
+webapp   ClusterIP   10.96.135.12   <none>        8080/TCP   2d23h   app=webapp
+
+NAME     ENDPOINTS                         AGE
+webapp   10.244.0.2:8080,10.244.0.6:8080   2d23h
