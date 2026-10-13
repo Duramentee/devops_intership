@@ -71,3 +71,13 @@ items:
   kind: Endpoints
 ❯ kc get endpointslice -n shortener -o yaml | head
 metadata.ownerReferences看属于哪个svc, 另外可接受流量的pod为空时, EndpointSlice有一个字段会标记为null, svc创建时也要注意写清spec.selector否则创建的endpoint将会为空
+
+L4: 命令不会写, 我对awk的语法基本忘光了, uniq 只会对相邻对象去重, 不做sort排序会得到错误结果
+D1: overlay2是容器运行时的文件系统, 和构建时无关, 然后层cache是通过对比cache key来判断是否为同一缓存的, cache key由父层cache+本层指令字符串+本层输入内容的哈希组成
+K25: 控制链路: 客户端->apiserver->etcd->Deployment controller->replicaset controller->kubelet(调用容器运行时创建容器)
+数据链路: 客户端->svc的ClusterIP->每个节点上kube proxy写入的转发规则->pod的ip和端口->容器
+CI2: 前端不能直接读到, 这两者分属于不同的job, 是跑在不同的runner上的(比如说不同的操作系统), 所以存在环境隔离, 哪怕不让两者并行执行而是串行执行也不行
+
+第一题: 执行ENTRYPOINT的指令
+
+第二题: docker的构建是逐层的, 参考cache key构成, 如果之前的cache发生了变更, 那么对应的变更层以及之后的所有层都不会cache, 而是会重构建, COPY go.mod ./ + RUN 下载依赖 + COPY . . 这样的方式就是按照不变的稳定的层在前原则构建的, 如果把COPY . .放在最前面, 那每次出现文件内容文件变更那都要重cache, 肯定会损失效率

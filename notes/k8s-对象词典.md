@@ -147,7 +147,7 @@
 
 | 问题 | 答案 |
 |---|---|
-| 它是什么类型的 API 资源 | Endpoints 是 `v1` 中的内置资源，EndpointSlice 是 `discovery.k8s.io/v1` 中的内置资源；两者保存的内容都是「某个 Service 的后端地址清单」，也就是当前可以接收流量的真实地址与端口 |
+| 它是什么类型的 API 资源 | Endpoints 是 `v1` 中的内置资源，EndpointSlice 是 `discovery.k8s.io/v1` 中的内置资源；两者保存的内容都是「某个 Service 的后端地址清单」，也就是当前可以接收流量的真实地址与端口。需要补充的边界条件：在 Kubernetes v1.33 及以后，`v1` 的 Endpoints 已被标记为弃用，官方建议改用 `discovery.k8s.io/v1` 的 EndpointSlice（10-13 复习实测，命令输出 `Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice`） |
 | 它属于哪个层级 | 命名空间级对象 |
 | 谁创建它 | 当 Service 带有选择器时，由 `kube-controller-manager` 中的端点控制器自动创建；当 Service 不带选择器时，控制器不会创建它，必须由人创建同名的对象（p.222-224） |
 | 它的生命周期与谁绑定 | 与同名的 Service 一起存在；Pod 被创建、被删除、就绪状态发生变化或者标签发生变化时，端点集合都随之更新（p.524）。删除 Service 时同名的 Endpoints 对象会随之被删除 |
@@ -277,6 +277,8 @@ graph LR
 | Service 到 Endpoints | 端点控制器 | `spec.selector` 与每个 Pod 的 `Ready` 条件 | Pod 就绪状态变化时端点列表随之更新 |
 | Endpoints 到转发规则 | 每个节点上的 kube-proxy | 端点对象中的地址与端口 | 发往 ClusterIP 的连接被转发到端点列表中的某一个地址 |
 | ConfigMap 与 Secret 到容器 | Pod 所在节点上的 kubelet | Pod 模板中的 `envFrom`、`valueFrom`、`volumes[]` 与 `volumeMounts[]` | 以环境变量方式注入时在容器创建时写入一次，以卷挂载方式注入时写入文件并随对象内容变化而更新 |
+
+> 字段路径提醒：`ownerReferences` 位于 `metadata` 之下，并且字段名是复数 `ownerReferences`，写成 `spec.ownerReference` 是错的；它是判断「这个对象属于谁」的权威依据（10-13 复习实测确认）。
 
 ---
 
